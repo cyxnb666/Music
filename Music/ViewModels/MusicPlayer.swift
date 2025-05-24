@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import SwiftUI
+import MediaPlayer // 添加MediaPlayer框架
 
 // MARK: - 音乐播放器类
 class MusicPlayer: ObservableObject {
@@ -24,21 +25,97 @@ class MusicPlayer: ObservableObject {
     
     init() {
         setupAudioSession()
+        setupRemoteTransportControls() // 添加远程控制设置
     }
     
     deinit {
         if let observer = timeObserver {
             player?.removeTimeObserver(observer)
         }
+        // 清理远程控制
+        UIApplication.shared.endReceivingRemoteControlEvents()
     }
     
     private func setupAudioSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+            print("音频会话设置成功")
         } catch {
             print("音频会话设置失败: \(error)")
         }
+    }
+    
+    // MARK: - 远程控制设置
+    private func setupRemoteTransportControls() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        
+        // 播放/暂停按钮
+        commandCenter.playCommand.addTarget { [weak self] event in
+            self?.play()
+            return .success
+        }
+        
+        commandCenter.pauseCommand.addTarget { [weak self] event in
+            self?.pause()
+            return .success
+        }
+        
+        commandCenter.togglePlayPauseCommand.addTarget { [weak self] event in
+            self?.togglePlayPause()
+            return .success
+        }
+        
+        // 上一首/下一首
+        commandCenter.previousTrackCommand.addTarget { [weak self] event in
+            self?.previousTrack()
+            return .success
+        }
+        
+        commandCenter.nextTrackCommand.addTarget { [weak self] event in
+            self?.nextTrack()
+            return .success
+        }
+        
+        // 进度控制
+        commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+            if let event = event as? MPChangePlaybackPositionCommandEvent {
+                self?.seekTo(time: event.positionTime)
+                return .success
+            }
+            return .commandFailed
+        }
+        
+        // 启用远程控制事件接收
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        print("远程控制设置完成")
+    }
+    
+    // MARK: - 更新锁屏和控制中心的媒体信息
+    private func updateNowPlayingInfo() {
+        guard let song = currentSong else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            return
+        }
+        
+        var nowPlayingInfo = [String: Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = song.title
+        nowPlayingInfo[MPMediaItemPropertyArtist] = song.artist
+        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        
+        // 设置默认封面图片
+        if let image = UIImage(systemName: "music.note.list") {
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in
+                return image
+            }
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+        }
+        
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        print("更新媒体信息: \(song.title)")
     }
     
     // MARK: - 文件导入
@@ -193,6 +270,7 @@ class MusicPlayer: ObservableObject {
                 if CMTimeGetSeconds(duration).isFinite {
                     self.duration = CMTimeGetSeconds(duration)
                     print("歌曲时长: \(self.duration) 秒")
+                    self.updateNowPlayingInfo() // 更新媒体信息
                 }
             }
         }
@@ -209,20 +287,33 @@ class MusicPlayer: ObservableObject {
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.currentTime = CMTimeGetSeconds(time)
             self?.updateLyricProgress()
+            self?.updateNowPlayingInfo() // 更新播放进度
         }
     }
     
-    func togglePlayPause() {
+    // MARK: - 播放控制方法
+    private func play() {
         guard let player = player else { return }
-        
+        player.play()
+        isPlaying = true
+        updateNowPlayingInfo()
+        print("开始播放")
+    }
+    
+    private func pause() {
+        guard let player = player else { return }
+        player.pause()
+        isPlaying = false
+        updateNowPlayingInfo()
+        print("暂停播放")
+    }
+    
+    func togglePlayPause() {
         if isPlaying {
-            player.pause()
-            print("暂停播放")
+            pause()
         } else {
-            player.play()
-            print("开始播放")
+            play()
         }
-        isPlaying.toggle()
     }
     
     func previousTrack() {
@@ -235,7 +326,11 @@ class MusicPlayer: ObservableObject {
     
     func seekTo(time: TimeInterval) {
         let cmTime = CMTime(seconds: time, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        player?.seek(to: cmTime)
+        player?.seek(to: cmTime) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateNowPlayingInfo()
+            }
+        }
     }
     
     func seekToLyric(at index: Int) {
