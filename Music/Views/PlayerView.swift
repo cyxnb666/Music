@@ -77,25 +77,19 @@ struct PlayerView: View {
                         
                         Spacer().frame(height: 30)
                         
-                        // 进度条
-                        VStack(spacing: 8) {
-                            ProgressView(value: musicPlayer.currentTime, total: musicPlayer.duration)
-                                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                            
-                            HStack {
-                                Text(formatTime(musicPlayer.currentTime))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                
-                                Spacer()
-                                
-                                Text(formatTime(musicPlayer.duration))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                        // 可拖拽进度条 - 替换原来的ProgressView
+                        DraggableProgressView(
+                            currentTime: Binding(
+                                get: { musicPlayer.currentTime },
+                                set: { _ in } // 只读绑定，实际更新通过onSeek
+                            ),
+                            duration: musicPlayer.duration,
+                            onSeek: { time in
+                                musicPlayer.seekTo(time: time)
                             }
-                        }
+                        )
                         .padding(.horizontal, 30)
-                        .frame(height: 30) // 固定高度
+                        .frame(height: 30) // 减少高度让时间更靠近
                         
                         Spacer().frame(height: 30)
                         
@@ -251,12 +245,6 @@ struct PlayerView: View {
         .onAppear {
             dragOffset = .zero
         }
-    }
-    
-    private func formatTime(_ time: TimeInterval) -> String {
-        let minutes = Int(time) / 60
-        let seconds = Int(time) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
     }
     
     // 新增：获取重复模式显示文本的辅助方法
