@@ -29,11 +29,17 @@ class MusicPlayer: ObservableObject {
     }
     
     deinit {
-        if let observer = timeObserver {
-            player?.removeTimeObserver(observer)
-        }
+        cleanupTimeObserver()
         // 清理远程控制
         UIApplication.shared.endReceivingRemoteControlEvents()
+    }
+    
+    // MARK: - 清理时间观察器的安全方法
+    private func cleanupTimeObserver() {
+        if let observer = timeObserver, let currentPlayer = player {
+            currentPlayer.removeTimeObserver(observer)
+            timeObserver = nil
+        }
     }
     
     private func setupAudioSession() {
@@ -255,12 +261,26 @@ class MusicPlayer: ObservableObject {
     // MARK: - 播放控制
     func loadSong(_ song: Song) {
         print("加载歌曲: \(song.title)")
+        
+        // 先清理旧的时间观察器（使用旧的player实例）
+        cleanupTimeObserver()
+        
+        // 停止当前播放
+        player?.pause()
+        
+        // 更新当前歌曲
         currentSong = song
         
+        // 创建新的播放器实例
         let playerItem = AVPlayerItem(url: song.url)
         player = AVPlayer(playerItem: playerItem)
         
-        // 设置时间观察器
+        // 重置时间相关的状态
+        currentTime = 0
+        duration = 0
+        isPlaying = false
+        
+        // 设置新的时间观察器
         setupTimeObserver()
         
         // 获取时长
@@ -274,21 +294,30 @@ class MusicPlayer: ObservableObject {
                 }
             }
         }
+        
+        print("歌曲加载完成: \(song.title)")
     }
     
     private func setupTimeObserver() {
-        // 移除旧的观察器
-        if let observer = timeObserver {
-            player?.removeTimeObserver(observer)
+        // 确保没有重复的观察器
+        if timeObserver != nil {
+            cleanupTimeObserver()
+        }
+        
+        guard let currentPlayer = player else {
+            print("无法设置时间观察器：播放器为空")
+            return
         }
         
         // 添加新的观察器
         let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+        timeObserver = currentPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.currentTime = CMTimeGetSeconds(time)
             self?.updateLyricProgress()
             self?.updateNowPlayingInfo() // 更新播放进度
         }
+        
+        print("时间观察器设置完成")
     }
     
     // MARK: - 播放控制方法

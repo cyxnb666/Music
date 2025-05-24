@@ -11,42 +11,53 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var musicPlayer = MusicPlayer()
     @StateObject private var songLibrary = SongLibrary()
+    @State private var showingFullPlayer = false
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
+            ZStack {
                 // 主要内容区域
-                if songLibrary.hasImportedLibrary {
-                    // 如果已导入歌曲库，显示歌曲列表或播放器界面
-                    if musicPlayer.currentSong != nil {
-                        PlayerView()
-                            .environmentObject(musicPlayer)
-                    } else {
+                VStack(spacing: 0) {
+                    if songLibrary.hasImportedLibrary {
                         // 显示歌曲列表界面
                         SongListView()
                             .environmentObject(musicPlayer)
                             .environmentObject(songLibrary)
+                    } else {
+                        // 显示欢迎界面，让用户导入文件夹
+                        WelcomeView()
+                            .environmentObject(musicPlayer)
+                            .environmentObject(songLibrary)
                     }
-                } else {
-                    // 显示欢迎界面，让用户导入文件夹
-                    WelcomeView()
+                    
+                    // 迷你播放器（只在歌曲列表界面且有歌曲播放时显示）
+                    if musicPlayer.currentSong != nil && songLibrary.hasImportedLibrary && !showingFullPlayer {
+                        MiniPlayerView(onTap: {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                showingFullPlayer = true
+                            }
+                        })
                         .environmentObject(musicPlayer)
-                        .environmentObject(songLibrary)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
+                .navigationTitle(songLibrary.hasImportedLibrary && !showingFullPlayer ? "我的音乐" : "")
+                .navigationBarTitleDisplayMode(.large)
                 
-                // 迷你播放器（如果有歌曲在播放）
-                if musicPlayer.currentSong != nil {
-                    MiniPlayerView()
-                        .environmentObject(musicPlayer)
+                // 播放器覆盖层 - 占据大部分屏幕但保留顶部状态栏
+                if showingFullPlayer {
+                    PlayerView(onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            showingFullPlayer = false
+                        }
+                    })
+                    .environmentObject(musicPlayer)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                    .zIndex(999)
                 }
-            }
-            .navigationTitle("我的音乐")
-            .navigationBarTitleDisplayMode(.large)
-        }
-        .onReceive(songLibrary.$songs) { songs in
-            // 当歌曲库更新时的处理
-            if !songs.isEmpty && musicPlayer.currentSong == nil {
-                // 暂时不自动播放
             }
         }
     }
