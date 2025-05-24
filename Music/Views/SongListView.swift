@@ -145,8 +145,14 @@ struct SongListView: View {
     private func playSong(_ song: Song) {
         print("播放歌曲: \(song.title)")
         
-        // 加载歌曲到播放器
-        musicPlayer.loadSong(song)
+        // 找到歌曲在列表中的索引
+        guard let songIndex = songLibrary.songs.firstIndex(where: { $0.id == song.id }) else {
+            print("未找到歌曲索引")
+            return
+        }
+        
+        // 设置播放列表并播放指定歌曲
+        musicPlayer.setPlaylist(songLibrary.songs, startIndex: songIndex)
         
         // 加载对应的歌词文件（如果存在）
         loadLyricsForSong(song)
@@ -157,8 +163,16 @@ struct SongListView: View {
     
     // MARK: - 播放全部歌曲
     private func playAllSongs() {
-        guard let firstSong = songLibrary.songs.first else { return }
-        playSong(firstSong)
+        guard !songLibrary.songs.isEmpty else { return }
+        
+        // 设置播放列表从第一首开始
+        musicPlayer.setPlaylist(songLibrary.songs, startIndex: 0)
+        
+        // 加载第一首歌曲的歌词
+        loadLyricsForSong(songLibrary.songs[0])
+        
+        // 开始播放
+        musicPlayer.togglePlayPause()
     }
     
     // MARK: - 加载歌曲对应的歌词

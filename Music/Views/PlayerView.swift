@@ -12,6 +12,7 @@ struct PlayerView: View {
     @EnvironmentObject var musicPlayer: MusicPlayer
     @State private var showingLyrics = false
     @State private var showingLyricsPicker = false
+    @State private var showingQueue = false  // 新增：播放队列显示状态
     @State private var dragOffset: CGSize = .zero
     
     let onDismiss: () -> Void
@@ -96,9 +97,9 @@ struct PlayerView: View {
                         .padding(.horizontal, 30)
                         .frame(height: 30) // 固定高度
                         
-                        Spacer().frame(height: 40)
+                        Spacer().frame(height: 30)
                         
-                        // 控制按钮
+                        // 主要控制按钮
                         HStack(spacing: 50) {
                             Button(action: {
                                 musicPlayer.previousTrack()
@@ -128,7 +129,55 @@ struct PlayerView: View {
                         }
                         .frame(height: 80) // 固定高度
                         
-                        Spacer()
+                        Spacer().frame(height: 20)
+                        
+                        // 播放模式控制按钮（新增）
+                        HStack(spacing: 40) {
+                            // 随机播放按钮
+                            Button(action: {
+                                musicPlayer.togglePlaybackMode()
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: musicPlayer.playbackMode.iconName)
+                                        .font(.title3)
+                                        .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
+                                    Text(musicPlayer.playbackMode == .shuffle ? "随机" : "顺序")
+                                        .font(.caption)
+                                        .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
+                                }
+                            }
+                            
+                            // 重复播放按钮
+                            Button(action: {
+                                musicPlayer.toggleRepeatMode()
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: musicPlayer.repeatMode.iconName)
+                                        .font(.title3)
+                                        .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
+                                    Text(getRepeatText())
+                                        .font(.caption)
+                                        .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
+                                }
+                            }
+                            
+                            // 播放队列按钮
+                            Button(action: {
+                                showingQueue = true
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "list.number")
+                                        .font(.title3)
+                                        .foregroundColor(.secondary)
+                                    Text("队列")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .frame(height: 60)
+                        
+                        Spacer().frame(height: 15)
                         
                         // 功能按钮 - 只保留歌词按钮
                         HStack {
@@ -195,6 +244,10 @@ struct PlayerView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingQueue) {  // 新增：播放队列 sheet
+            PlaybackQueueView()
+                .environmentObject(musicPlayer)
+        }
         .onAppear {
             dragOffset = .zero
         }
@@ -204,5 +257,14 @@ struct PlayerView: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    // 新增：获取重复模式显示文本的辅助方法
+    private func getRepeatText() -> String {
+        switch musicPlayer.repeatMode {
+        case .off: return "关闭"
+        case .all: return "列表"
+        case .one: return "单曲"
+        }
     }
 }

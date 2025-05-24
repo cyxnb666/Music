@@ -12,6 +12,7 @@ import MediaPlayer // 添加MediaPlayer框架
 
 // MARK: - 音乐播放器类
 class MusicPlayer: ObservableObject {
+    // 原有属性
     @Published var currentSong: Song?
     @Published var isPlaying = false
     @Published var currentTime: TimeInterval = 0
@@ -20,18 +21,30 @@ class MusicPlayer: ObservableObject {
     @Published var currentLyricIndex = 0
     @Published var lyricProgress: Double = 0
     
+    // 新增播放列表相关属性
+    @Published var playlist: [Song] = []           // 当前播放列表
+    @Published var originalPlaylist: [Song] = []   // 原始播放列表（用于shuffle）
+    @Published var currentIndex: Int = 0           // 当前歌曲在列表中的索引
+    @Published var playbackMode: PlaybackMode = .sequence
+    @Published var repeatMode: RepeatMode = .off
+    
+    private var shuffledIndices: [Int] = []        // 随机播放的索引数组
+    private var currentShuffleIndex: Int = 0       // 在随机数组中的当前位置
+    
     private var player: AVPlayer?
     private var timeObserver: Any?
     
     init() {
         setupAudioSession()
-        setupRemoteTransportControls() // 添加远程控制设置
+        setupRemoteTransportControls()
     }
     
     deinit {
         cleanupTimeObserver()
         // 清理远程控制
         UIApplication.shared.endReceivingRemoteControlEvents()
+        // 清理通知观察者
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - 清理时间观察器的安全方法
@@ -124,7 +137,94 @@ class MusicPlayer: ObservableObject {
         print("更新媒体信息: \(song.title)")
     }
     
-    // MARK: - 文件导入
+    // MARK: - 播放列表管理
+    func setPlaylist(_ songs: [Song], startIndex: Int = 0) {
+        originalPlaylist = songs
+        playlist = songs
+        currentIndex = startIndex
+        shuffledIndices = Array(0..<songs.count)
+        
+        // 如果是随机模式，立即打乱
+        if playbackMode == .shuffle {
+            shufflePlaylist()
+        }
+        
+        // 加载当前歌曲
+        if !playlist.isEmpty && currentIndex < playlist.count {
+            loadSong(playlist[currentIndex])
+        }
+    }
+    
+    func addToPlaylist(_ song: Song) {
+        originalPlaylist.append(song)
+        if playbackMode == .shuffle {
+            // 重新生成随机序列
+            shufflePlaylist()
+        } else {
+            playlist.append(song)
+        }
+    }
+    
+    // MARK: - 播放模式切换
+    func togglePlaybackMode() {
+        switch playbackMode {
+        case .sequence:
+            playbackMode = .shuffle
+            shufflePlaylist()
+        case .shuffle:
+            playbackMode = .sequence
+            restoreOriginalOrder()
+        }
+    }
+    
+    func toggleRepeatMode() {
+        switch repeatMode {
+        case .off:
+            repeatMode = .all
+        case .all:
+            repeatMode = .one
+        case .one:
+            repeatMode = .off
+        }
+    }
+    
+    // MARK: - 随机播放处理
+    private func shufflePlaylist() {
+        guard !originalPlaylist.isEmpty else { return }
+        
+        // 创建随机索引数组
+        shuffledIndices = Array(0..<originalPlaylist.count)
+        
+        // 如果有当前播放的歌曲，确保它在随机列表的第一位
+        if let currentSong = currentSong,
+           let originalIndex = originalPlaylist.firstIndex(where: { $0.id == currentSong.id }) {
+            shuffledIndices.shuffle()
+            // 将当前歌曲移到第一位
+            if let shufflePos = shuffledIndices.firstIndex(of: originalIndex) {
+                shuffledIndices.swapAt(0, shufflePos)
+            }
+            currentShuffleIndex = 0
+        } else {
+            shuffledIndices.shuffle()
+            currentShuffleIndex = 0
+        }
+        
+        // 更新播放列表
+        playlist = shuffledIndices.map { originalPlaylist[$0] }
+        currentIndex = 0
+    }
+    
+    private func restoreOriginalOrder() {
+        playlist = originalPlaylist
+        
+        // 找到当前歌曲在原始列表中的位置
+        if let currentSong = currentSong,
+           let originalIndex = originalPlaylist.firstIndex(where: { $0.id == currentSong.id }) {
+            currentIndex = originalIndex
+        }
+    }
+    
+    // MARK: - 文件导入（保持原有逻辑）
     func handleFileImport(_ url: URL) {
         print("开始处理音乐文件导入: \(url.path)")
         
@@ -205,7 +305,7 @@ class MusicPlayer: ObservableObject {
         }
     }
     
-    // MARK: - LRC歌词解析
+    // MARK: - LRC歌词解析（保持原有逻辑）
     func parseLRCContent(_ content: String) -> [LyricLine] {
         var lyricLines: [LyricLine] = []
         let lines = content.components(separatedBy: .newlines)
@@ -283,6 +383,9 @@ class MusicPlayer: ObservableObject {
         // 设置新的时间观察器
         setupTimeObserver()
         
+        // 设置播放结束监听
+        setupPlayerItemObserver()
+        
         // 获取时长
         playerItem.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
             DispatchQueue.main.async {
@@ -320,6 +423,24 @@ class MusicPlayer: ObservableObject {
         print("时间观察器设置完成")
     }
     
+    // MARK: - 播放结束监听
+    private func setupPlayerItemObserver() {
+        guard let playerItem = player?.currentItem else { return }
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerDidFinishPlaying),
+            name: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem
+        )
+    }
+    
+    @objc private func playerDidFinishPlaying() {
+        DispatchQueue.main.async {
+            self.playNext()
+        }
+    }
+    
     // MARK: - 播放控制方法
     private func play() {
         guard let player = player else { return }
@@ -345,12 +466,143 @@ class MusicPlayer: ObservableObject {
         }
     }
     
+    // MARK: - 修正的上一首/下一首方法
     func previousTrack() {
-        seekTo(time: 0)
+        guard !playlist.isEmpty else {
+            // 如果没有播放列表，使用原有逻辑
+            seekTo(time: 0)
+            return
+        }
+        
+        // 如果当前播放时间超过3秒，先跳到歌曲开头
+        if currentTime > 3.0 {
+            seekTo(time: 0)
+            return
+        }
+        
+        switch playbackMode {
+        case .sequence:
+            if currentIndex > 0 {
+                currentIndex -= 1
+            } else if repeatMode == .all {
+                currentIndex = playlist.count - 1
+            } else {
+                // 已经是第一首，跳到开头
+                seekTo(time: 0)
+                return
+            }
+            
+        case .shuffle:
+            if currentShuffleIndex > 0 {
+                currentShuffleIndex -= 1
+            } else if repeatMode == .all {
+                currentShuffleIndex = shuffledIndices.count - 1
+            } else {
+                seekTo(time: 0)
+                return
+            }
+        }
+        
+        // 加载新歌曲
+        let song = playbackMode == .shuffle ?
+            originalPlaylist[shuffledIndices[currentShuffleIndex]] :
+            playlist[currentIndex]
+        loadSong(song)
+        
+        // 如果之前在播放，继续播放
+        if wasPlaying() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.play()
+            }
+        }
     }
     
     func nextTrack() {
-        seekTo(time: duration)
+        guard !playlist.isEmpty else {
+            // 如果没有播放列表，使用原有逻辑
+            seekTo(time: duration)
+            return
+        }
+        
+        // 单曲循环模式
+        if repeatMode == .one {
+            seekTo(time: 0)
+            if wasPlaying() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.play()
+                }
+            }
+            return
+        }
+        
+        switch playbackMode {
+        case .sequence:
+            if currentIndex < playlist.count - 1 {
+                currentIndex += 1
+            } else if repeatMode == .all {
+                currentIndex = 0
+            } else {
+                // 已经是最后一首，停止播放
+                pause()
+                return
+            }
+            
+        case .shuffle:
+            if currentShuffleIndex < shuffledIndices.count - 1 {
+                currentShuffleIndex += 1
+            } else if repeatMode == .all {
+                // 重新打乱并从头开始
+                shufflePlaylist()
+                currentShuffleIndex = 0
+            } else {
+                pause()
+                return
+            }
+        }
+        
+        // 加载新歌曲
+        let song = playbackMode == .shuffle ?
+            originalPlaylist[shuffledIndices[currentShuffleIndex]] :
+            playlist[currentIndex]
+        loadSong(song)
+        
+        // 如果之前在播放，继续播放
+        if wasPlaying() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.play()
+            }
+        }
+    }
+    
+    // 判断是否应该继续播放
+    private func wasPlaying() -> Bool {
+        return isPlaying || player?.timeControlStatus == .playing
+    }
+    
+    // MARK: - 自动播放下一首（歌曲结束时调用）
+    func playNext() {
+        nextTrack()
+    }
+    
+    // MARK: - 播放指定索引的歌曲
+    func playTrack(at index: Int) {
+        guard index >= 0 && index < originalPlaylist.count else { return }
+        
+        if playbackMode == .shuffle {
+            // 在随机模式下，需要找到该歌曲在随机数组中的位置
+            if let shuffleIndex = shuffledIndices.firstIndex(of: index) {
+                currentShuffleIndex = shuffleIndex
+            }
+        } else {
+            currentIndex = index
+        }
+        
+        let song = originalPlaylist[index]
+        loadSong(song)
+        
+        if !isPlaying {
+            play()
+        }
     }
     
     func seekTo(time: TimeInterval) {
@@ -392,5 +644,21 @@ class MusicPlayer: ObservableObject {
             let elapsed = currentTime - currentLyric.time
             lyricProgress = min(1.0, max(0.0, elapsed / lyricDuration))
         }
+    }
+    
+    // MARK: - 获取播放队列信息
+    func getQueueInfo() -> (current: Int, total: Int, upcoming: [Song]) {
+        guard !playlist.isEmpty else {
+            return (current: 0, total: 0, upcoming: [])
+        }
+        
+        let upcomingCount = min(5, playlist.count - currentIndex - 1)
+        let upcoming = Array(playlist.suffix(from: currentIndex + 1).prefix(upcomingCount))
+        
+        return (
+            current: currentIndex + 1,
+            total: playlist.count,
+            upcoming: upcoming
+        )
     }
 }
