@@ -11,9 +11,7 @@ import SwiftUI
 struct PlayerView: View {
     @EnvironmentObject var musicPlayer: MusicPlayer
     @State private var showingLyrics = false
-    @State private var showingMusicPicker = false
     @State private var showingLyricsPicker = false
-    @State private var showingLyricsInfo = false
     @State private var dragOffset: CGSize = .zero
     
     let onDismiss: () -> Void
@@ -21,195 +19,149 @@ struct PlayerView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                // 顶部留白区域 - 类似Apple Music的设计
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 60) // 保留顶部空间，类似截图中的白色区域
-                
-                // 播放器主体
+                // 播放器主体 - 固定布局，无滚动
                 VStack(spacing: 0) {
-                    // 拖拽指示器和关闭按钮
-                    VStack(spacing: 12) {
-                        // 拖拽指示器
+                    // 拖拽指示器
+                    VStack {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Color.secondary.opacity(0.3))
                             .frame(width: 40, height: 4)
-                            .padding(.top, 8)
+                            .padding(.top, 60) // 调整位置避开灵动岛
+                    }
+                    .frame(height: 80) // 固定高度
+                    
+                    // 主要内容区域 - 固定布局
+                    VStack(spacing: 0) {
+                        Spacer()
                         
-                        // 关闭按钮
-                        HStack {
+                        // 封面图片
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .frame(width: min(280, geometry.size.width - 60), height: min(280, geometry.size.width - 60))
+                            .overlay(
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(.white)
+                            )
+                            .scaleEffect(musicPlayer.isPlaying ? 1.05 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: musicPlayer.isPlaying)
+                            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                        
+                        Spacer().frame(height: 30)
+                        
+                        // 歌曲信息
+                        VStack(spacing: 8) {
+                            Text(musicPlayer.currentSong?.title ?? "未知歌曲")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                            
+                            Text(musicPlayer.currentSong?.artist ?? "未知艺术家")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            // 歌词状态指示
+                            if !musicPlayer.lyrics.isEmpty {
+                                Text("✓ 已加载歌词")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            } else {
+                                Text("无歌词文件")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .frame(height: 80) // 固定高度
+                        
+                        Spacer().frame(height: 30)
+                        
+                        // 进度条
+                        VStack(spacing: 8) {
+                            ProgressView(value: musicPlayer.currentTime, total: musicPlayer.duration)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                            
+                            HStack {
+                                Text(formatTime(musicPlayer.currentTime))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Text(formatTime(musicPlayer.duration))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 30)
+                        .frame(height: 30) // 固定高度
+                        
+                        Spacer().frame(height: 40)
+                        
+                        // 控制按钮
+                        HStack(spacing: 50) {
                             Button(action: {
-                                onDismiss()
+                                musicPlayer.previousTrack()
                             }) {
-                                Image(systemName: "chevron.down")
+                                Image(systemName: "backward.fill")
                                     .font(.title2)
-                                    .fontWeight(.medium)
                                     .foregroundColor(.primary)
                             }
                             
-                            Spacer()
+                            Button(action: {
+                                musicPlayer.togglePlayPause()
+                            }) {
+                                Image(systemName: musicPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                    .font(.system(size: 70))
+                                    .foregroundColor(.blue)
+                            }
+                            .scaleEffect(musicPlayer.isPlaying ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 0.2), value: musicPlayer.isPlaying)
                             
-                            Text("正在播放")
-                                .font(.headline)
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                            
-                            // 占位符，保持布局平衡
-                            Image(systemName: "chevron.down")
-                                .font(.title2)
-                                .opacity(0)
-                        }
-                        .padding(.horizontal)
-                    }
-                    .background(Color(UIColor.systemBackground))
-                    
-                    // 播放器内容
-                    ScrollView {
-                        VStack(spacing: 30) {
-                            Spacer(minLength: 20)
-                            
-                            // 封面图片
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .frame(width: 280, height: 280)
-                                .overlay(
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 60))
-                                        .foregroundColor(.white)
-                                )
-                                .scaleEffect(musicPlayer.isPlaying ? 1.05 : 1.0)
-                                .animation(.easeInOut(duration: 0.3), value: musicPlayer.isPlaying)
-                                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                            
-                            // 歌曲信息
-                            VStack(spacing: 8) {
-                                Text(musicPlayer.currentSong?.title ?? "未知歌曲")
+                            Button(action: {
+                                musicPlayer.nextTrack()
+                            }) {
+                                Image(systemName: "forward.fill")
                                     .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .multilineTextAlignment(.center)
-                                
-                                Text(musicPlayer.currentSong?.artist ?? "未知艺术家")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                
-                                // 歌词状态指示
-                                if !musicPlayer.lyrics.isEmpty {
-                                    Text("✓ 已加载歌词")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                        .frame(height: 80) // 固定高度
+                        
+                        Spacer()
+                        
+                        // 功能按钮 - 只保留歌词按钮
+                        HStack {
+                            Spacer()
+                            
+                            Button(action: {
+                                if musicPlayer.lyrics.isEmpty {
+                                    showingLyricsPicker = true
                                 } else {
-                                    Text("无歌词文件")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                    showingLyrics = true
                                 }
-                            }
-                            
-                            // 进度条
-                            VStack(spacing: 8) {
-                                ProgressView(value: musicPlayer.currentTime, total: musicPlayer.duration)
-                                    .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                                
-                                HStack {
-                                    Text(formatTime(musicPlayer.currentTime))
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: musicPlayer.lyrics.isEmpty ? "text.quote" : "text.book.closed")
+                                        .font(.title3)
+                                        .foregroundColor(.blue)
+                                    Text(musicPlayer.lyrics.isEmpty ? "导入歌词" : "查看歌词")
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Spacer()
-                                    
-                                    Text(formatTime(musicPlayer.duration))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            // 控制按钮
-                            HStack(spacing: 40) {
-                                Button(action: {
-                                    musicPlayer.previousTrack()
-                                }) {
-                                    Image(systemName: "backward.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.primary)
-                                }
-                                
-                                Button(action: {
-                                    musicPlayer.togglePlayPause()
-                                }) {
-                                    Image(systemName: musicPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                        .font(.system(size: 60))
                                         .foregroundColor(.blue)
                                 }
-                                .scaleEffect(musicPlayer.isPlaying ? 1.1 : 1.0)
-                                .animation(.easeInOut(duration: 0.2), value: musicPlayer.isPlaying)
-                                
-                                Button(action: {
-                                    musicPlayer.nextTrack()
-                                }) {
-                                    Image(systemName: "forward.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.primary)
-                                }
                             }
                             
-                            Divider()
-                                .padding(.horizontal)
-                            
-                            // 功能按钮
-                            HStack(spacing: 30) {
-                                Button(action: {
-                                    if musicPlayer.lyrics.isEmpty {
-                                        showingLyricsPicker = true
-                                    } else {
-                                        showingLyrics = true
-                                    }
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: musicPlayer.lyrics.isEmpty ? "text.quote" : "text.book.closed")
-                                            .font(.title3)
-                                            .foregroundColor(.blue)
-                                        Text(musicPlayer.lyrics.isEmpty ? "导入歌词" : "查看歌词")
-                                            .font(.caption)
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                                
-                                Button(action: {
-                                    showingLyricsInfo = true
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "questionmark.circle")
-                                            .font(.title3)
-                                            .foregroundColor(.blue)
-                                        Text("歌词格式")
-                                            .font(.caption)
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                                
-                                Button(action: {
-                                    showingMusicPicker = true
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "plus.circle")
-                                            .font(.title3)
-                                            .foregroundColor(.blue)
-                                        Text("换歌曲")
-                                            .font(.caption)
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                            }
-                            
-                            Spacer(minLength: 50)
+                            Spacer()
                         }
+                        .frame(height: 60) // 固定高度
+                        
+                        // 底部安全区域
+                        Spacer().frame(height: 50)
                     }
-                    .scrollDisabled(abs(dragOffset.height) > 10) // 拖拽时禁用滚动
                 }
                 .background(Color(UIColor.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 16)) // 顶部圆角
             }
+            .clipShape(RoundedRectangle(cornerRadius: 16)) // 顶部圆角
             .offset(y: max(0, dragOffset.height)) // 只允许向下偏移
             .gesture(
                 DragGesture(coordinateSpace: .global)
@@ -236,24 +188,12 @@ struct PlayerView: View {
             LyricsView()
                 .environmentObject(musicPlayer)
         }
-        .sheet(isPresented: $showingMusicPicker) {
-            MusicDocumentPicker { urls in
-                if let url = urls.first {
-                    musicPlayer.handleFileImport(url)
-                }
-            }
-        }
         .sheet(isPresented: $showingLyricsPicker) {
             LyricsDocumentPicker { urls in
                 if let url = urls.first {
                     musicPlayer.handleLyricsImport(url)
                 }
             }
-        }
-        .alert("LRC歌词文件格式", isPresented: $showingLyricsInfo) {
-            Button("知道了") { }
-        } message: {
-            Text("歌词文件使用.lrc格式，内容示例：\n\n[00:12.50]第一句歌词\n[00:17.20]第二句歌词\n[00:21.80]第三句歌词\n\n时间格式：[分钟:秒.毫秒]歌词内容\n\n你可以从网上下载对应歌曲的.lrc文件，或自己制作。")
         }
         .onAppear {
             dragOffset = .zero

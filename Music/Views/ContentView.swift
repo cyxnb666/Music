@@ -14,52 +14,50 @@ struct ContentView: View {
     @State private var showingFullPlayer = false
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // 主要内容区域
-                VStack(spacing: 0) {
-                    if songLibrary.hasImportedLibrary {
-                        // 显示歌曲列表界面
-                        SongListView()
-                            .environmentObject(musicPlayer)
-                            .environmentObject(songLibrary)
-                    } else {
-                        // 显示欢迎界面，让用户导入文件夹
-                        WelcomeView()
-                            .environmentObject(musicPlayer)
-                            .environmentObject(songLibrary)
-                    }
-                    
-                    // 迷你播放器（只在歌曲列表界面且有歌曲播放时显示）
-                    if musicPlayer.currentSong != nil && songLibrary.hasImportedLibrary && !showingFullPlayer {
-                        MiniPlayerView(onTap: {
-                            withAnimation(.easeInOut(duration: 0.4)) {
-                                showingFullPlayer = true
-                            }
-                        })
+        ZStack {
+            // 主要内容区域
+            VStack(spacing: 0) {
+                if songLibrary.hasImportedLibrary {
+                    // 显示歌曲列表界面
+                    SongListView()
                         .environmentObject(musicPlayer)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+                        .environmentObject(songLibrary)
+                } else {
+                    // 显示欢迎界面，让用户导入文件夹
+                    WelcomeView()
+                        .environmentObject(musicPlayer)
+                        .environmentObject(songLibrary)
                 }
-                .navigationTitle(songLibrary.hasImportedLibrary && !showingFullPlayer ? "我的音乐" : "")
-                .navigationBarTitleDisplayMode(.large)
                 
-                // 播放器覆盖层 - 占据大部分屏幕但保留顶部状态栏
-                if showingFullPlayer {
-                    PlayerView(onDismiss: {
+                // 迷你播放器（只在歌曲列表界面且有歌曲播放时显示）
+                if musicPlayer.currentSong != nil && songLibrary.hasImportedLibrary && !showingFullPlayer {
+                    MiniPlayerView(onTap: {
                         withAnimation(.easeInOut(duration: 0.4)) {
-                            showingFullPlayer = false
+                            showingFullPlayer = true
                         }
                     })
                     .environmentObject(musicPlayer)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .move(edge: .bottom).combined(with: .opacity)
-                    ))
-                    .zIndex(999)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            
+            // 播放器覆盖层 - 完全全屏
+            if showingFullPlayer {
+                PlayerView(onDismiss: {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        showingFullPlayer = false
+                    }
+                })
+                .environmentObject(musicPlayer)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom),
+                    removal: .move(edge: .bottom)
+                ))
+                .zIndex(999)
+                .ignoresSafeArea(.all) // 完全全屏
+            }
         }
+        .background(Color(UIColor.systemBackground))
     }
 }
 

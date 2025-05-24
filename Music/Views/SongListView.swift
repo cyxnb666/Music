@@ -137,6 +137,7 @@ struct SongListView: View {
             }
         }
         .padding()
+        .padding(.top, 8) // 额外的顶部间距替代导航标题
         .background(Color(UIColor.systemBackground))
     }
     
