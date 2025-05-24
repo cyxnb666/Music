@@ -37,6 +37,7 @@ class MusicPlayer: ObservableObject {
     init() {
         setupAudioSession()
         setupRemoteTransportControls()
+        setupNotificationObservers()
     }
     
     deinit {
@@ -387,13 +388,35 @@ class MusicPlayer: ObservableObject {
         setupPlayerItemObserver()
         
         // 获取时长
-        playerItem.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
-            DispatchQueue.main.async {
-                let duration = playerItem.asset.duration
-                if CMTimeGetSeconds(duration).isFinite {
-                    self.duration = CMTimeGetSeconds(duration)
-                    print("歌曲时长: \(self.duration) 秒")
-                    self.updateNowPlayingInfo() // 更新媒体信息
+        if #available(iOS 16.0, *) {
+            // 使用新的 async/await API
+            Task {
+                do {
+                    let assetDuration = try await playerItem.asset.load(.duration)
+                    await MainActor.run {
+                        if CMTimeGetSeconds(assetDuration).isFinite {
+                            self.duration = CMTimeGetSeconds(assetDuration)
+                            print("歌曲时长: \(self.duration) 秒")
+                            self.updateNowPlayingInfo()
+                        }
+                    }
+                } catch {
+                    print("加载歌曲时长失败: \(error)")
+                    await MainActor.run {
+                        self.duration = 0
+                    }
+                }
+            }
+        } else {
+            // 使用旧的 API 以保持向后兼容
+            playerItem.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
+                DispatchQueue.main.async {
+                    let duration = playerItem.asset.duration
+                    if CMTimeGetSeconds(duration).isFinite {
+                        self.duration = CMTimeGetSeconds(duration)
+                        print("歌曲时长: \(self.duration) 秒")
+                        self.updateNowPlayingInfo()
+                    }
                 }
             }
         }
@@ -412,12 +435,17 @@ class MusicPlayer: ObservableObject {
             return
         }
         
-        // 添加新的观察器
-        let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        // 添加时间观察器
+        let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC)) // 稍微降低频率
         timeObserver = currentPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            self?.currentTime = CMTimeGetSeconds(time)
-            self?.updateLyricProgress()
-            self?.updateNowPlayingInfo() // 更新播放进度
+            guard let self = self else { return }
+            
+            self.currentTime = CMTimeGetSeconds(time)
+            self.updateLyricProgress()
+            self.updateNowPlayingInfo()
+            
+            // 定期检查播放状态是否同步（每0.5秒一次，不会太频繁）
+            self.syncPlayerState()
         }
         
         print("时间观察器设置完成")
@@ -441,20 +469,99 @@ class MusicPlayer: ObservableObject {
         }
     }
     
+    private func setupNotificationObservers() {
+        // 监听音频会话中断
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        
+        // 监听应用进入前台
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+    
+    // MARK: - 音频会话中断处理
+    @objc private func handleAudioSessionInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        DispatchQueue.main.async {
+            switch type {
+            case .began:
+                // 中断开始 - 暂停播放
+                print("音频会话被中断，暂停播放")
+                self.isPlaying = false
+                self.updateNowPlayingInfo()
+                
+            case .ended:
+                // 中断结束 - 同步播放器状态但不自动播放
+                print("音频会话中断结束")
+                self.syncPlayerState()
+                
+            @unknown default:
+                break
+            }
+        }
+    }
+    
+    @objc private func applicationDidBecomeActive() {
+        // 应用重新激活时同步播放状态
+        DispatchQueue.main.async {
+            self.syncPlayerState()
+        }
+    }
+
+    private func syncPlayerState() {
+        guard let player = player else {
+            if isPlaying {
+                isPlaying = false
+                updateNowPlayingInfo()
+            }
+            return
+        }
+        
+        // 根据播放器的实际状态同步UI状态
+        let actuallyPlaying = (player.timeControlStatus == .playing)
+        
+        if isPlaying != actuallyPlaying {
+            print("同步播放状态: UI显示=\(isPlaying), 实际状态=\(actuallyPlaying)")
+            isPlaying = actuallyPlaying
+            updateNowPlayingInfo()
+        }
+    }
+    
     // MARK: - 播放控制方法
     private func play() {
         guard let player = player else { return }
         player.play()
-        isPlaying = true
-        updateNowPlayingInfo()
+        
+        // 延迟一点检查状态，确保播放器状态已更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.syncPlayerState()
+        }
+        
         print("开始播放")
     }
     
     private func pause() {
         guard let player = player else { return }
         player.pause()
-        isPlaying = false
-        updateNowPlayingInfo()
+        
+        // 延迟一点检查状态，确保播放器状态已更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.syncPlayerState()
+        }
+        
         print("暂停播放")
     }
     
@@ -480,6 +587,9 @@ class MusicPlayer: ObservableObject {
             return
         }
         
+        // 保存当前播放状态
+        let shouldContinuePlayingAfterLoad = isPlaying
+        
         switch playbackMode {
         case .sequence:
             if currentIndex > 0 {
@@ -487,8 +597,9 @@ class MusicPlayer: ObservableObject {
             } else if repeatMode == .all {
                 currentIndex = playlist.count - 1
             } else {
-                // 已经是第一首，跳到开头
+                // 已经是第一首，跳到开头并暂停（按用户要求）
                 seekTo(time: 0)
+                pause()
                 return
             }
             
@@ -498,7 +609,9 @@ class MusicPlayer: ObservableObject {
             } else if repeatMode == .all {
                 currentShuffleIndex = shuffledIndices.count - 1
             } else {
+                // 已经是第一首，跳到开头并暂停（按用户要求）
                 seekTo(time: 0)
+                pause()
                 return
             }
         }
@@ -510,13 +623,13 @@ class MusicPlayer: ObservableObject {
         loadSong(song)
         
         // 如果之前在播放，继续播放
-        if wasPlaying() {
+        if shouldContinuePlayingAfterLoad {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.play()
             }
         }
     }
-    
+
     func nextTrack() {
         guard !playlist.isEmpty else {
             // 如果没有播放列表，使用原有逻辑
@@ -527,13 +640,18 @@ class MusicPlayer: ObservableObject {
         // 单曲循环模式
         if repeatMode == .one {
             seekTo(time: 0)
-            if wasPlaying() {
+            // 保存播放状态并继续播放
+            let shouldContinuePlayingAfterSeek = isPlaying
+            if shouldContinuePlayingAfterSeek {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.play()
                 }
             }
             return
         }
+        
+        // 保存当前播放状态
+        let shouldContinuePlayingAfterLoad = isPlaying
         
         switch playbackMode {
         case .sequence:
@@ -542,7 +660,7 @@ class MusicPlayer: ObservableObject {
             } else if repeatMode == .all {
                 currentIndex = 0
             } else {
-                // 已经是最后一首，停止播放
+                // 已经是最后一首，停止播放（按用户要求）
                 pause()
                 return
             }
@@ -555,6 +673,7 @@ class MusicPlayer: ObservableObject {
                 shufflePlaylist()
                 currentShuffleIndex = 0
             } else {
+                // 已经是最后一首，停止播放（按用户要求）
                 pause()
                 return
             }
@@ -567,7 +686,7 @@ class MusicPlayer: ObservableObject {
         loadSong(song)
         
         // 如果之前在播放，继续播放
-        if wasPlaying() {
+        if shouldContinuePlayingAfterLoad {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.play()
             }
