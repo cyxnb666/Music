@@ -10,9 +10,9 @@ import SwiftUI
 // MARK: - 欢迎界面
 struct WelcomeView: View {
     @EnvironmentObject var musicPlayer: MusicPlayer
-    @State private var showingMusicPicker = false
-    @State private var showingLyricsPicker = false
-    @State private var showingLyricsInfo = false
+    @EnvironmentObject var songLibrary: SongLibrary
+    @State private var showingFolderPicker = false
+    @State private var showingFolderInfo = false
     
     var body: some View {
         VStack(spacing: 30) {
@@ -24,16 +24,17 @@ struct WelcomeView: View {
                 .font(.title)
                 .fontWeight(.bold)
             
-            Text("导入您的音乐文件开始播放")
+            Text("导入您的音乐文件夹开始使用")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
             
             VStack(spacing: 20) {
                 Button(action: {
-                    print("点击导入音乐文件按钮")
-                    showingMusicPicker = true
+                    print("点击导入音乐文件夹按钮")
+                    showingFolderPicker = true
                 }) {
-                    Label("导入音乐文件", systemImage: "music.note.list")
+                    Label("导入音乐文件夹", systemImage: "folder.badge.plus")
                         .font(.headline)
                         .foregroundColor(.white)
                         .padding()
@@ -41,53 +42,58 @@ struct WelcomeView: View {
                         .background(Color.blue)
                         .cornerRadius(12)
                 }
+                .opacity(songLibrary.isLoading ? 0.6 : 1.0)
+                .disabled(songLibrary.isLoading)
                 
-                // 如果已经有音乐，显示导入歌词选项
-                if musicPlayer.currentSong != nil {
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            showingLyricsPicker = true
-                        }) {
-                            Label("导入歌词文件", systemImage: "text.quote")
-                                .font(.headline)
-                                .foregroundColor(.blue)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(12)
-                        }
-                        
-                        Button(action: {
-                            showingLyricsInfo = true
-                        }) {
-                            Text("❓ 什么是歌词文件？")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                Button(action: {
+                    showingFolderInfo = true
+                }) {
+                    Text("❓ 文件夹应该如何组织？")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // 显示加载状态
+                if songLibrary.isLoading {
+                    VStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("正在扫描音乐文件...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    .padding()
                 }
             }
             .padding(.horizontal)
         }
         .padding()
-        .sheet(isPresented: $showingMusicPicker) {
-            MusicDocumentPicker { urls in
-                if let url = urls.first {
-                    musicPlayer.handleFileImport(url)
+        .sheet(isPresented: $showingFolderPicker) {
+            FolderDocumentPicker { folderURL in
+                if let folderURL = folderURL {
+                    print("用户选择了文件夹: \(folderURL)")
+                    songLibrary.importMusicFolder(folderURL)
                 }
             }
         }
-        .sheet(isPresented: $showingLyricsPicker) {
-            LyricsDocumentPicker { urls in
-                if let url = urls.first {
-                    musicPlayer.handleLyricsImport(url)
-                }
-            }
-        }
-        .alert("LRC歌词文件格式", isPresented: $showingLyricsInfo) {
+        .alert("音乐文件夹结构说明", isPresented: $showingFolderInfo) {
             Button("知道了") { }
         } message: {
-            Text("歌词文件使用.lrc格式，内容示例：\n[00:12.50]第一句歌词\n[00:17.20]第二句歌词\n\n时间格式：[分钟:秒.毫秒]")
+            Text("""
+请选择包含歌曲子文件夹的主文件夹。
+
+文件夹结构应该是：
+📁 我的音乐
+  📁 七里香
+    🎵 七里香.mp3
+    📝 七里香.lrc
+  📁 白色风车  
+    🎵 白色风车.m4a
+    📝 白色风车.lrc
+
+每个歌曲文件夹名称将作为歌曲标题。
+歌词文件(.lrc)是可选的。
+""")
         }
     }
 }

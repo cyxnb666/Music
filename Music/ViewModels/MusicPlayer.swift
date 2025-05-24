@@ -200,7 +200,7 @@ class MusicPlayer: ObservableObject {
     }
     
     // MARK: - LRC歌词解析
-    private func parseLRCContent(_ content: String) -> [LyricLine] {
+    func parseLRCContent(_ content: String) -> [LyricLine] {
         var lyricLines: [LyricLine] = []
         let lines = content.components(separatedBy: .newlines)
         
