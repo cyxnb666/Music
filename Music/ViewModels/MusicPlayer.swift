@@ -241,20 +241,59 @@ class MusicPlayer: ObservableObject {
     
     // MARK: - 播放列表管理
     func setPlaylist(_ songs: [Song], startIndex: Int = 0) {
-        originalPlaylist = songs
-        playlist = songs
-        currentIndex = startIndex
-        shuffledIndices = Array(0..<songs.count)
+        print("🎵 设置播放列表，歌曲数量: \(songs.count), 起始索引: \(startIndex)")
         
-        // 如果是随机模式，立即打乱
+        originalPlaylist = songs
+        currentIndex = startIndex
+        
+        // 根据当前播放模式设置播放列表
         if playbackMode == .shuffle {
-            shufflePlaylist()
+            // 随机模式：打乱列表但确保指定的歌曲在首位
+            setupShufflePlaylist(startIndex: startIndex)
+        } else {
+            // 顺序模式：直接使用原始列表
+            playlist = songs
+            shuffledIndices = Array(0..<songs.count)
         }
         
         // 加载当前歌曲
         if !playlist.isEmpty && currentIndex < playlist.count {
-            loadSong(playlist[currentIndex])
+            let songToLoad = playlist[currentIndex]
+            loadSong(songToLoad)
+            print("✅ 加载歌曲: \(songToLoad.title), 当前索引: \(currentIndex)")
         }
+    }
+    
+    private func setupShufflePlaylist(startIndex: Int) {
+        guard !originalPlaylist.isEmpty && startIndex < originalPlaylist.count else {
+            playlist = originalPlaylist
+            shuffledIndices = Array(0..<originalPlaylist.count)
+            currentIndex = 0
+            return
+        }
+        
+        // 创建随机索引数组
+        shuffledIndices = Array(0..<originalPlaylist.count)
+        
+        // 确保指定的起始歌曲在第一位
+        let targetSong = originalPlaylist[startIndex]
+        
+        // 打乱除了起始歌曲之外的所有歌曲
+        var remainingIndices = shuffledIndices.filter { $0 != startIndex }
+        remainingIndices.shuffle()
+        
+        // 重新构建打乱后的索引数组：起始歌曲在第一位，其他随机排列
+        shuffledIndices = [startIndex] + remainingIndices
+        
+        // 根据打乱后的索引创建播放列表
+        playlist = shuffledIndices.map { originalPlaylist[$0] }
+        
+        // 当前索引设为0（因为我们把目标歌曲放在了第一位）
+        currentIndex = 0
+        currentShuffleIndex = 0
+        
+        print("🔀 随机播放列表已设置，起始歌曲: \(targetSong.title)")
+        print("🎶 播放顺序: \(playlist.map { $0.title }.prefix(3).joined(separator: " -> "))...")
     }
     
     func addToPlaylist(_ song: Song) {
@@ -272,7 +311,9 @@ class MusicPlayer: ObservableObject {
         switch playbackMode {
         case .sequence:
             playbackMode = .shuffle
-            shufflePlaylist()
+            if !playlist.isEmpty {
+                shufflePlaylist()
+            }
             print("🔀 切换到随机播放模式")
         case .shuffle:
             playbackMode = .sequence
@@ -299,28 +340,37 @@ class MusicPlayer: ObservableObject {
     private func shufflePlaylist() {
         guard !originalPlaylist.isEmpty else { return }
         
+        // 如果有当前播放的歌曲，保持它在当前位置
+        let currentSongToPreserve = currentSong
+        
         // 创建随机索引数组
         shuffledIndices = Array(0..<originalPlaylist.count)
         
-        // 如果有当前播放的歌曲，确保它在随机列表的第一位
-        if let currentSong = currentSong,
+        if let currentSong = currentSongToPreserve,
            let originalIndex = originalPlaylist.firstIndex(where: { $0.id == currentSong.id }) {
-            shuffledIndices.shuffle()
-            // 将当前歌曲移到第一位
-            if let shufflePos = shuffledIndices.firstIndex(of: originalIndex) {
-                shuffledIndices.swapAt(0, shufflePos)
+            
+            // 打乱除当前歌曲外的其他歌曲
+            var remainingIndices = shuffledIndices.filter { $0 != originalIndex }
+            remainingIndices.shuffle()
+            
+            // 当前歌曲保持在当前播放位置
+            shuffledIndices = Array(shuffledIndices[0..<currentIndex]) + [originalIndex] + remainingIndices
+            if shuffledIndices.count > currentIndex + 1 {
+                let afterCurrent = Array(shuffledIndices[(currentIndex + 1)...])
+                shuffledIndices = Array(shuffledIndices[0...currentIndex]) + afterCurrent.shuffled()
             }
-            currentShuffleIndex = 0
+            
+            currentShuffleIndex = currentIndex
         } else {
             shuffledIndices.shuffle()
             currentShuffleIndex = 0
+            currentIndex = 0
         }
         
         // 更新播放列表
         playlist = shuffledIndices.map { originalPlaylist[$0] }
-        currentIndex = 0
         
-        print("🔀 播放列表已重新随机排序")
+        print("🔀 播放列表已重新随机排序，当前索引: \(currentIndex)")
     }
     
     private func restoreOriginalOrder() {
@@ -330,9 +380,11 @@ class MusicPlayer: ObservableObject {
         if let currentSong = currentSong,
            let originalIndex = originalPlaylist.firstIndex(where: { $0.id == currentSong.id }) {
             currentIndex = originalIndex
+        } else {
+            currentIndex = 0
         }
         
-        print("📋 播放列表已恢复原始顺序")
+        print("📋 播放列表已恢复原始顺序，当前索引: \(currentIndex)")
     }
     
     // MARK: - 文件导入（保持原有逻辑）

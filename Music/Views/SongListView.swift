@@ -13,6 +13,20 @@ struct SongListView: View {
     @EnvironmentObject var musicPlayer: MusicPlayer
     @EnvironmentObject var songLibrary: SongLibrary
     @State private var showingFolderPicker = false
+    @State private var searchText = "" // 搜索文本
+    @State private var isSearching = false // 是否正在搜索
+    
+    // 过滤后的歌曲列表
+    private var filteredSongs: [Song] {
+        if searchText.isEmpty {
+            return songLibrary.songs
+        } else {
+            return songLibrary.songs.filter { song in
+                song.title.localizedCaseInsensitiveContains(searchText) ||
+                song.artist.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -74,9 +88,15 @@ struct SongListView: View {
             // 列表头部信息
             listHeaderView
             
+            // 搜索栏
+            searchBarView
+            
+            // 播放控制按钮区域
+            playControlButtonsView
+            
             // 歌曲列表
             List {
-                ForEach(songLibrary.songs, id: \.id) { song in
+                ForEach(filteredSongs, id: \.id) { song in
                     SongRowView(
                         song: song,
                         isPlaying: musicPlayer.currentSong?.id == song.id && musicPlayer.isPlaying,
@@ -98,46 +118,25 @@ struct SongListView: View {
     
     // MARK: - 列表头部
     private var listHeaderView: some View {
-        VStack(spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("我的音乐库")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text("\(songLibrary.songs.count) 首歌曲")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("我的音乐库")
+                    .font(.title2)
+                    .fontWeight(.semibold)
                 
-                Spacer()
-                
-                Button(action: {
-                    showingFolderPicker = true
-                }) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                }
+                Text("\(songLibrary.songs.count) 首歌曲")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
             
-            // 播放全部按钮
-            if !songLibrary.songs.isEmpty {
-                Button(action: {
-                    playAllSongs()
-                }) {
-                    HStack {
-                        Image(systemName: "play.fill")
-                        Text("播放全部")
-                            .fontWeight(.medium)
-                    }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .cornerRadius(12)
-                }
+            Spacer()
+            
+            Button(action: {
+                showingFolderPicker = true
+            }) {
+                Image(systemName: "folder.badge.plus")
+                    .font(.title2)
+                    .foregroundColor(.blue)
             }
         }
         .padding()
@@ -145,38 +144,219 @@ struct SongListView: View {
         .background(Color(UIColor.systemBackground))
     }
     
+    // MARK: - 搜索栏视图
+    private var searchBarView: some View {
+        VStack(spacing: 0) {
+            HStack {
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                        .font(.body)
+                    
+                    TextField("搜索歌曲或艺术家", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .onTapGesture {
+                            isSearching = true
+                        }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            isSearching = false
+                            // 隐藏键盘
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.body)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(10)
+                
+                if isSearching {
+                    Button("取消") {
+                        searchText = ""
+                        isSearching = false
+                        // 隐藏键盘
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                    .foregroundColor(.blue)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal)
+            .animation(.easeInOut(duration: 0.3), value: isSearching)
+            
+            // 搜索结果提示
+            if !searchText.isEmpty {
+                HStack {
+                    Text("找到 \(filteredSongs.count) 首歌曲")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+        }
+        .padding(.vertical, 12)
+        .background(Color(UIColor.systemBackground))
+    }
+    
+    // MARK: - 播放控制按钮区域
+    private var playControlButtonsView: some View {
+        VStack(spacing: 16) {
+            // 如果有搜索结果或没有搜索时显示按钮
+            if !filteredSongs.isEmpty {
+                HStack(spacing: 12) {
+                    // 播放按钮（从第一首开始）
+                    Button(action: {
+                        playFromBeginning()
+                    }) {
+                        HStack {
+                            Image(systemName: "play.fill")
+                            Text("播放")
+                                .fontWeight(.medium)
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    
+                    // 随机播放按钮
+                    Button(action: {
+                        playRandomly()
+                    }) {
+                        HStack {
+                            Image(systemName: "shuffle")
+                            Text("随机播放")
+                                .fontWeight(.medium)
+                        }
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // 如果有搜索但没有结果，显示提示
+            if !searchText.isEmpty && filteredSongs.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 30))
+                        .foregroundColor(.secondary)
+                    
+                    Text("未找到匹配的歌曲")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("尝试其他关键词")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 20)
+            }
+        }
+        .background(Color(UIColor.systemBackground))
+    }
+    
     // MARK: - 播放歌曲
     private func playSong(_ song: Song) {
         print("播放歌曲: \(song.title)")
         
-        // 找到歌曲在列表中的索引
-        guard let songIndex = songLibrary.songs.firstIndex(where: { $0.id == song.id }) else {
+        // 使用当前显示的歌曲列表（可能是搜索结果）
+        let songsToPlay = filteredSongs
+        
+        // 找到歌曲在当前显示列表中的索引
+        guard let songIndex = songsToPlay.firstIndex(where: { $0.id == song.id }) else {
             print("未找到歌曲索引")
             return
         }
         
+        // 先设置为顺序播放模式，避免随机逻辑干扰
+        musicPlayer.playbackMode = .sequence
+        
         // 设置播放列表并播放指定歌曲
-        musicPlayer.setPlaylist(songLibrary.songs, startIndex: songIndex)
+        musicPlayer.setPlaylist(songsToPlay, startIndex: songIndex)
         
         // 加载对应的歌词文件（如果存在）
         loadLyricsForSong(song)
         
         // 开始播放
-        musicPlayer.togglePlayPause()
+        if !musicPlayer.isPlaying {
+            musicPlayer.togglePlayPause()
+        }
     }
     
-    // MARK: - 播放全部歌曲
-    private func playAllSongs() {
-        guard !songLibrary.songs.isEmpty else { return }
+    // MARK: - 从头开始播放
+    private func playFromBeginning() {
+        let songsToPlay = filteredSongs
+        guard !songsToPlay.isEmpty else { return }
+        
+        print("从第一首开始播放，共 \(songsToPlay.count) 首歌曲")
+        
+        // 设置为顺序播放模式
+        musicPlayer.playbackMode = .sequence
         
         // 设置播放列表从第一首开始
-        musicPlayer.setPlaylist(songLibrary.songs, startIndex: 0)
+        musicPlayer.setPlaylist(songsToPlay, startIndex: 0)
         
         // 加载第一首歌曲的歌词
-        loadLyricsForSong(songLibrary.songs[0])
+        loadLyricsForSong(songsToPlay[0])
         
         // 开始播放
-        musicPlayer.togglePlayPause()
+        if !musicPlayer.isPlaying {
+            musicPlayer.togglePlayPause()
+        }
+    }
+    
+    // MARK: - 随机播放
+    private func playRandomly() {
+        let songsToPlay = filteredSongs
+        guard !songsToPlay.isEmpty else { return }
+        
+        print("开始随机播放，共 \(songsToPlay.count) 首歌曲")
+        
+        // 随机选择一首歌作为开始
+        let randomStartIndex = Int.random(in: 0..<songsToPlay.count)
+        let selectedSong = songsToPlay[randomStartIndex]
+        
+        print("🎲 随机选择的索引: \(randomStartIndex), 歌曲: \(selectedSong.title)")
+        
+        // 先设置为随机播放模式
+        musicPlayer.playbackMode = .shuffle
+        
+        // 设置播放列表，MusicPlayer会处理随机逻辑
+        musicPlayer.setPlaylist(songsToPlay, startIndex: randomStartIndex)
+        
+        // 加载选中歌曲的歌词
+        loadLyricsForSong(selectedSong)
+        
+        // 开始播放
+        if !musicPlayer.isPlaying {
+            musicPlayer.togglePlayPause()
+        }
+        
+        // 提供触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        print("✅ 随机播放已开始，当前歌曲：\(selectedSong.title)")
     }
     
     // MARK: - 删除歌曲
