@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-// MARK: - 可拖拽进度条
+// MARK: - 可拖拽进度条（紧凑版）
 struct DraggableProgressView: View {
     @Binding var currentTime: TimeInterval
     let duration: TimeInterval
@@ -112,7 +112,7 @@ struct DraggableProgressView: View {
                         }
                 )
             }
-            .frame(height: 50) // 增加触摸区域以容纳更粗的进度条
+            .frame(height: 30) // 从50减少到30，减少占用空间
             .animation(.easeInOut(duration: 0.15), value: isTouching)
             .animation(.easeInOut(duration: 0.15), value: isDragging)
             
@@ -130,7 +130,7 @@ struct DraggableProgressView: View {
                     .foregroundColor(.secondary)
                     .monospacedDigit()
             }
-            .padding(.top, -2) // 负数padding让时间显示更贴近进度条
+            .padding(.top, -8) // 增加负数padding让时间显示更贴近进度条
         }
     }
     

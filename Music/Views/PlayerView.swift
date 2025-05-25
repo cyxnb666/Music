@@ -12,7 +12,7 @@ struct PlayerView: View {
     @EnvironmentObject var musicPlayer: MusicPlayer
     @State private var showingLyrics = false
     @State private var showingLyricsPicker = false
-    @State private var showingQueue = false  // 新增：播放队列显示状态
+    @State private var showingQueue = false
     @State private var dragOffset: CGSize = .zero
     
     let onDismiss: () -> Void
@@ -75,10 +75,10 @@ struct PlayerView: View {
                         }
                         .frame(height: 80) // 固定高度
                         
-                        Spacer().frame(height: 30)
+                        Spacer().frame(height: 20)
                         
-                        // 可拖拽进度条 - 替换原来的ProgressView
-                        DraggableProgressView(
+                        // 进度条板块 - 独立组件
+                        ProgressSection(
                             currentTime: Binding(
                                 get: { musicPlayer.currentTime },
                                 set: { _ in } // 只读绑定，实际更新通过onSeek
@@ -88,8 +88,6 @@ struct PlayerView: View {
                                 musicPlayer.seekTo(time: time)
                             }
                         )
-                        .padding(.horizontal, 30)
-                        .frame(height: 30) // 减少高度让时间更靠近
                         
                         Spacer().frame(height: 30)
                         
@@ -125,7 +123,7 @@ struct PlayerView: View {
                         
                         Spacer().frame(height: 20)
                         
-                        // 播放模式控制按钮（新增）
+                        // 播放模式控制按钮
                         HStack(spacing: 40) {
                             // 随机播放按钮
                             Button(action: {
@@ -238,7 +236,7 @@ struct PlayerView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingQueue) {  // 新增：播放队列 sheet
+        .sheet(isPresented: $showingQueue) {
             PlaybackQueueView()
                 .environmentObject(musicPlayer)
         }
@@ -247,7 +245,7 @@ struct PlayerView: View {
         }
     }
     
-    // 新增：获取重复模式显示文本的辅助方法
+    // 获取重复模式显示文本的辅助方法
     private func getRepeatText() -> String {
         switch musicPlayer.repeatMode {
         case .off: return "关闭"
