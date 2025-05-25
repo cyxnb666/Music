@@ -88,7 +88,7 @@ struct SongListView: View {
             }
             .listStyle(PlainListStyle())
             // 为迷你播放器留出底部空间
-            .padding(.bottom, musicPlayer.currentSong != nil ? 70 : 0)
+            .padding(.bottom, musicPlayer.currentSong != nil ? 80 : 0)
         }
     }
     

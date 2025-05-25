@@ -1,4 +1,3 @@
-//
 //  ContentView.swift
 //  Music
 //
@@ -29,7 +28,7 @@ struct ContentView: View {
                         .environmentObject(songLibrary)
                 }
                 
-                // 迷你播放器（只在歌曲列表界面且有歌曲播放时显示）
+                // 迷你播放器（底部悬浮，只在歌曲列表界面且有歌曲播放时显示）
                 if musicPlayer.currentSong != nil && songLibrary.hasImportedLibrary && !showingFullPlayer {
                     MiniPlayerView(onTap: {
                         withAnimation(.easeInOut(duration: 0.4)) {
@@ -40,6 +39,7 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .background(Color(UIColor.systemBackground))
             
             // 播放器覆盖层 - 完全全屏
             if showingFullPlayer {
