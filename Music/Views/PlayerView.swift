@@ -37,7 +37,7 @@ struct PlayerView: View {
                         
                         // 封面图片
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .fill(AppColors.primaryGradient)
                             .frame(width: min(280, geometry.size.width - 60), height: min(280, geometry.size.width - 60))
                             .overlay(
                                 Image(systemName: "music.note")
@@ -106,7 +106,7 @@ struct PlayerView: View {
                             }) {
                                 Image(systemName: musicPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                     .font(.system(size: 70))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(AppColors.primary)
                             }
                             .scaleEffect(musicPlayer.isPlaying ? 1.1 : 1.0)
                             .animation(.easeInOut(duration: 0.2), value: musicPlayer.isPlaying)
@@ -135,10 +135,10 @@ struct PlayerView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: musicPlayer.lyrics.isEmpty ? "text.quote" : "text.book.closed")
                                         .font(.title3)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(AppColors.primary)
                                     Text(musicPlayer.lyrics.isEmpty ? "导入歌词" : "查看歌词")
                                         .font(.caption)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(AppColors.primary)
                                 }
                             }
                             
@@ -148,10 +148,10 @@ struct PlayerView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "list.number")
                                         .font(.title3)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(AppColors.primary)
                                     Text("播放队列")
                                         .font(.caption)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(AppColors.primary)
                                 }
                             }
                         }

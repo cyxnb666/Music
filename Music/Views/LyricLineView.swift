@@ -23,7 +23,7 @@ struct LyricLineView: View {
                 // 进度高亮效果
                 GeometryReader { geometry in
                     Rectangle()
-                        .fill(Color.blue.opacity(0.3))
+                        .fill(AppColors.primaryOpacity30)
                         .frame(width: geometry.size.width * progress)
                         .animation(.linear(duration: 0.1), value: progress)
                 }

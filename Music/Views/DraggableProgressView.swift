@@ -42,7 +42,7 @@ struct DraggableProgressView: View {
                     
                     // 已播放进度
                     RoundedRectangle(cornerRadius: getCornerRadius())
-                        .fill(Color.blue) // 保持统一的蓝色
+                        .fill(AppColors.primary) // 保持统一的主题色
                         .frame(
                             width: geometry.size.width * progress,
                             height: getTrackHeight()

@@ -15,7 +15,7 @@ struct MiniPlayerView: View {
         HStack(spacing: 12) {
             // 封面
             RoundedRectangle(cornerRadius: 8)
-                .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(AppColors.primaryGradient)
                 .frame(width: 50, height: 50)
                 .overlay(
                     Image(systemName: "music.note")
@@ -52,7 +52,7 @@ struct MiniPlayerView: View {
             // 简化的进度条
             VStack(spacing: 2) {
                 ProgressView(value: musicPlayer.currentTime, total: musicPlayer.duration)
-                    .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                    .progressViewStyle(LinearProgressViewStyle(tint: AppColors.primary))
                     .frame(height: 2)
                 
                 HStack {

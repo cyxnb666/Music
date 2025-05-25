@@ -84,9 +84,10 @@ struct PlaybackQueueView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("") {
                         dismiss()
                     }
+                    .foregroundColor(AppColors.primary)  // 新增这一行
                 }
             }
         }
@@ -114,17 +115,17 @@ struct PlaybackQueueView: View {
                     VStack(spacing: 8) {
                         ZStack {
                             Circle()
-                                .fill(musicPlayer.playbackMode == .shuffle ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                                .fill(musicPlayer.playbackMode == .shuffle ? AppColors.primaryOpacity20 : Color.gray.opacity(0.1))
                                 .frame(width: 50, height: 50)
                             
                             Image(systemName: musicPlayer.playbackMode.iconName)
                                 .font(.title2)
-                                .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
+                                .foregroundColor(musicPlayer.playbackMode == .shuffle ? AppColors.primary : .secondary)
                         }
                         
                         Text(musicPlayer.playbackMode.displayName)
                             .font(.caption)
-                            .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
+                            .foregroundColor(musicPlayer.playbackMode == .shuffle ? AppColors.primary : .secondary)
                             .multilineTextAlignment(.center)
                     }
                 }
@@ -144,17 +145,17 @@ struct PlaybackQueueView: View {
                     VStack(spacing: 8) {
                         ZStack {
                             Circle()
-                                .fill(musicPlayer.repeatMode != .off ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                                .fill(musicPlayer.repeatMode != .off ? AppColors.primaryOpacity20 : Color.gray.opacity(0.1))
                                 .frame(width: 50, height: 50)
                             
                             Image(systemName: musicPlayer.repeatMode.iconName)
                                 .font(.title2)
-                                .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
+                                .foregroundColor(musicPlayer.repeatMode != .off ? AppColors.primary : .secondary)
                         }
                         
                         Text(getRepeatDisplayText())
                             .font(.caption)
-                            .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
+                            .foregroundColor(musicPlayer.repeatMode != .off ? AppColors.primary : .secondary)
                             .multilineTextAlignment(.center)
                     }
                 }
@@ -221,25 +222,25 @@ struct CurrentPlayingSongRow: View {
             // 播放动画指示器
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.blue.opacity(0.2))
+                    .fill(AppColors.primaryOpacity20)
                     .frame(width: 50, height: 50)
                 
                 if musicPlayer.isPlaying {
                     Image(systemName: "waveform")
                         .font(.title3)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                         .symbolEffect(.variableColor.iterative.dimInactiveLayers.nonReversing)
                 } else {
                     Image(systemName: "pause.fill")
                         .font(.title3)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                 }
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
                     .font(.headline)
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primary)
                     .lineLimit(1)
                 
                 Text(song.artist)
@@ -255,13 +256,13 @@ struct CurrentPlayingSongRow: View {
                 if musicPlayer.playbackMode == .shuffle {
                     Image(systemName: "shuffle")
                         .font(.caption2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                 }
                 
                 if musicPlayer.repeatMode != .off {
                     Image(systemName: musicPlayer.repeatMode.iconName)
                         .font(.caption2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                 }
             }
         }
@@ -313,7 +314,7 @@ struct UpcomingSongRow: View {
                 Button(action: onPlay) {
                     Image(systemName: "play.fill")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                 }
                 .buttonStyle(PlainButtonStyle())
             }

@@ -41,9 +41,10 @@ struct LyricsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("") {
                         dismiss()
                     }
+                    .foregroundColor(AppColors.primary)  // 新增这一行
                 }
             }
         }

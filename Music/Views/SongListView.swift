@@ -73,7 +73,7 @@ struct SongListView: View {
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding()
-                    .background(Color.blue)
+                    .background(AppColors.primary)
                     .cornerRadius(12)
             }
             
@@ -136,7 +136,7 @@ struct SongListView: View {
             }) {
                 Image(systemName: "folder.badge.plus")
                     .font(.title2)
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primary)
             }
         }
         .padding()
@@ -184,7 +184,7 @@ struct SongListView: View {
                         // 隐藏键盘
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(AppColors.primary)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -226,7 +226,7 @@ struct SongListView: View {
                         .foregroundColor(.white)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(AppColors.primary)
                         .cornerRadius(12)
                     }
                     
@@ -240,14 +240,14 @@ struct SongListView: View {
                                 .fontWeight(.medium)
                         }
                         .font(.headline)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue.opacity(0.1))
+                        .background(AppColors.primaryOpacity10)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue, lineWidth: 1)
+                                .stroke(AppColors.primary, lineWidth: 1)
                         )
                     }
                 }
@@ -444,18 +444,18 @@ struct SongRowView: View {
             // 播放状态指示器
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isCurrentSong ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                    .fill(isCurrentSong ? AppColors.primaryOpacity20 : Color.gray.opacity(0.1))
                     .frame(width: 50, height: 50)
                 
                 if isPlaying {
                     Image(systemName: "waveform")
                         .font(.title3)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                         .symbolEffect(.variableColor.iterative.dimInactiveLayers.nonReversing)
                 } else if isCurrentSong {
                     Image(systemName: "pause.fill")
                         .font(.title3)
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primary)
                 } else {
                     Image(systemName: "music.note")
                         .font(.title3)
@@ -467,7 +467,7 @@ struct SongRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
                     .font(.headline)
-                    .foregroundColor(isCurrentSong ? .blue : .primary)
+                    .foregroundColor(isCurrentSong ? AppColors.primary : .primary)
                     .lineLimit(1)
                 
                 Text(song.artist)

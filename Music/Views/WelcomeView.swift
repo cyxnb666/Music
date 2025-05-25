@@ -18,7 +18,7 @@ struct WelcomeView: View {
         VStack(spacing: 30) {
             Image(systemName: "music.note")
                 .font(.system(size: 80))
-                .foregroundColor(.blue)
+                .foregroundColor(AppColors.primary)
             
             Text("欢迎使用音乐播放器")
                 .font(.title)
@@ -39,7 +39,7 @@ struct WelcomeView: View {
                         .foregroundColor(.white)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(AppColors.primary)
                         .cornerRadius(12)
                 }
                 .opacity(songLibrary.isLoading ? 0.6 : 1.0)
