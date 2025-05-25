@@ -15,6 +15,9 @@ struct PlaybackQueueView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                // 播放模式控制区域
+                playbackControlsSection
+                
                 // 当前播放
                 if let currentSong = musicPlayer.currentSong {
                     VStack(alignment: .leading, spacing: 12) {
@@ -89,6 +92,89 @@ struct PlaybackQueueView: View {
         }
     }
     
+    // MARK: - 播放模式控制区域
+    private var playbackControlsSection: some View {
+        VStack(spacing: 16) {
+            Text("播放设置")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+            
+            HStack(spacing: 20) {
+                // 播放模式按钮
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        musicPlayer.togglePlaybackMode()
+                    }
+                    
+                    // 触觉反馈
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                }) {
+                    VStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(musicPlayer.playbackMode == .shuffle ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                                .frame(width: 50, height: 50)
+                            
+                            Image(systemName: musicPlayer.playbackMode.iconName)
+                                .font(.title2)
+                                .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
+                        }
+                        
+                        Text(musicPlayer.playbackMode.displayName)
+                            .font(.caption)
+                            .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .frame(maxWidth: .infinity)
+                
+                // 重复模式按钮
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        musicPlayer.toggleRepeatMode()
+                    }
+                    
+                    // 触觉反馈
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                }) {
+                    VStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(musicPlayer.repeatMode != .off ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                                .frame(width: 50, height: 50)
+                            
+                            Image(systemName: musicPlayer.repeatMode.iconName)
+                                .font(.title2)
+                                .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
+                        }
+                        
+                        Text(getRepeatDisplayText())
+                            .font(.caption)
+                            .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal)
+            
+            // 当前模式说明
+            Text(getCurrentModeDescription())
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+        }
+        .padding(.vertical, 16)
+        .background(Color(UIColor.secondarySystemBackground))
+    }
+    
     // MARK: - 拖拽重排序处理
     private func moveItems(from source: IndexSet, to destination: Int) {
         // 调用MusicPlayer的重排序方法
@@ -97,6 +183,31 @@ struct PlaybackQueueView: View {
         // 提供触觉反馈
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
+    }
+    
+    // MARK: - 辅助方法
+    private func getRepeatDisplayText() -> String {
+        switch musicPlayer.repeatMode {
+        case .off: return "关闭重复"
+        case .all: return "重复列表"
+        case .one: return "单曲循环"
+        }
+    }
+    
+    private func getCurrentModeDescription() -> String {
+        let playbackText = musicPlayer.playbackMode == .shuffle ? "随机播放" : "按顺序播放"
+        let repeatText: String
+        
+        switch musicPlayer.repeatMode {
+        case .off:
+            repeatText = "播放完成后停止"
+        case .all:
+            repeatText = "列表播放完后重新开始"
+        case .one:
+            repeatText = "当前歌曲单曲循环"
+        }
+        
+        return "\(playbackText)，\(repeatText)"
     }
 }
 
@@ -143,13 +254,13 @@ struct CurrentPlayingSongRow: View {
             VStack(spacing: 2) {
                 if musicPlayer.playbackMode == .shuffle {
                     Image(systemName: "shuffle")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.blue)
                 }
                 
                 if musicPlayer.repeatMode != .off {
                     Image(systemName: musicPlayer.repeatMode.iconName)
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.blue)
                 }
             }

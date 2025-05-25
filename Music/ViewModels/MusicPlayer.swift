@@ -25,8 +25,16 @@ class MusicPlayer: ObservableObject {
     @Published var playlist: [Song] = []           // 当前播放列表
     @Published var originalPlaylist: [Song] = []   // 原始播放列表（用于shuffle）
     @Published var currentIndex: Int = 0           // 当前歌曲在列表中的索引
-    @Published var playbackMode: PlaybackMode = .sequence
-    @Published var repeatMode: RepeatMode = .off
+    @Published var playbackMode: PlaybackMode = .sequence {
+        didSet {
+            savePlaybackSettings() // 播放模式改变时保存设置
+        }
+    }
+    @Published var repeatMode: RepeatMode = .off {
+        didSet {
+            savePlaybackSettings() // 重复模式改变时保存设置
+        }
+    }
     
     private var shuffledIndices: [Int] = []        // 随机播放的索引数组
     private var currentShuffleIndex: Int = 0       // 在随机数组中的当前位置
@@ -34,7 +42,16 @@ class MusicPlayer: ObservableObject {
     private var player: AVPlayer?
     private var timeObserver: Any?
     
+    // MARK: - 持久化设置的键
+    private struct SettingsKeys {
+        static let playbackMode = "MusicPlayer.PlaybackMode"
+        static let repeatMode = "MusicPlayer.RepeatMode"
+        static let lastPlayedSongTitle = "MusicPlayer.LastPlayedSongTitle"
+        static let lastPlayedTime = "MusicPlayer.LastPlayedTime"
+    }
+    
     init() {
+        loadPlaybackSettings() // 启动时加载保存的设置
         setupAudioSession()
         setupRemoteTransportControls()
         setupNotificationObservers()
@@ -46,6 +63,90 @@ class MusicPlayer: ObservableObject {
         UIApplication.shared.endReceivingRemoteControlEvents()
         // 清理通知观察者
         NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - 持久化设置管理
+    private func savePlaybackSettings() {
+        let defaults = UserDefaults.standard
+        
+        // 保存播放模式
+        switch playbackMode {
+        case .sequence:
+            defaults.set("sequence", forKey: SettingsKeys.playbackMode)
+        case .shuffle:
+            defaults.set("shuffle", forKey: SettingsKeys.playbackMode)
+        }
+        
+        // 保存重复模式
+        switch repeatMode {
+        case .off:
+            defaults.set("off", forKey: SettingsKeys.repeatMode)
+        case .all:
+            defaults.set("all", forKey: SettingsKeys.repeatMode)
+        case .one:
+            defaults.set("one", forKey: SettingsKeys.repeatMode)
+        }
+        
+        // 保存当前播放的歌曲信息（可选）
+        if let currentSong = currentSong {
+            defaults.set(currentSong.title, forKey: SettingsKeys.lastPlayedSongTitle)
+            defaults.set(currentTime, forKey: SettingsKeys.lastPlayedTime)
+        }
+        
+        print("✅ 播放设置已保存 - 播放模式: \(playbackMode.displayName), 重复模式: \(repeatMode.displayName)")
+    }
+    
+    private func loadPlaybackSettings() {
+        let defaults = UserDefaults.standard
+        
+        // 加载播放模式，默认为顺序播放
+        let savedPlaybackMode = defaults.string(forKey: SettingsKeys.playbackMode) ?? "sequence"
+        switch savedPlaybackMode {
+        case "sequence":
+            playbackMode = .sequence
+        case "shuffle":
+            playbackMode = .shuffle
+        default:
+            playbackMode = .sequence
+        }
+        
+        // 加载重复模式，默认为关闭
+        let savedRepeatMode = defaults.string(forKey: SettingsKeys.repeatMode) ?? "off"
+        switch savedRepeatMode {
+        case "off":
+            repeatMode = .off
+        case "all":
+            repeatMode = .all
+        case "one":
+            repeatMode = .one
+        default:
+            repeatMode = .off
+        }
+        
+        print("✅ 播放设置已加载 - 播放模式: \(playbackMode.displayName), 重复模式: \(repeatMode.displayName)")
+    }
+    
+    // MARK: - 获取上次播放信息（可选功能）
+    func getLastPlayedInfo() -> (songTitle: String?, lastTime: TimeInterval) {
+        let defaults = UserDefaults.standard
+        let songTitle = defaults.string(forKey: SettingsKeys.lastPlayedSongTitle)
+        let lastTime = defaults.double(forKey: SettingsKeys.lastPlayedTime)
+        return (songTitle, lastTime)
+    }
+    
+    // MARK: - 清理持久化设置（用于重置功能）
+    func clearSavedSettings() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: SettingsKeys.playbackMode)
+        defaults.removeObject(forKey: SettingsKeys.repeatMode)
+        defaults.removeObject(forKey: SettingsKeys.lastPlayedSongTitle)
+        defaults.removeObject(forKey: SettingsKeys.lastPlayedTime)
+        
+        // 重置为默认值
+        playbackMode = .sequence
+        repeatMode = .off
+        
+        print("✅ 播放设置已重置为默认值")
     }
     
     // MARK: - 清理时间观察器的安全方法
@@ -166,15 +267,17 @@ class MusicPlayer: ObservableObject {
         }
     }
     
-    // MARK: - 播放模式切换
+    // MARK: - 播放模式切换（会自动触发保存）
     func togglePlaybackMode() {
         switch playbackMode {
         case .sequence:
             playbackMode = .shuffle
             shufflePlaylist()
+            print("🔀 切换到随机播放模式")
         case .shuffle:
             playbackMode = .sequence
             restoreOriginalOrder()
+            print("📋 切换到顺序播放模式")
         }
     }
     
@@ -182,10 +285,13 @@ class MusicPlayer: ObservableObject {
         switch repeatMode {
         case .off:
             repeatMode = .all
+            print("🔁 切换到重复列表模式")
         case .all:
             repeatMode = .one
+            print("🔂 切换到单曲循环模式")
         case .one:
             repeatMode = .off
+            print("⏹️ 关闭重复播放")
         }
     }
     
@@ -213,6 +319,8 @@ class MusicPlayer: ObservableObject {
         // 更新播放列表
         playlist = shuffledIndices.map { originalPlaylist[$0] }
         currentIndex = 0
+        
+        print("🔀 播放列表已重新随机排序")
     }
     
     private func restoreOriginalOrder() {
@@ -223,6 +331,8 @@ class MusicPlayer: ObservableObject {
            let originalIndex = originalPlaylist.firstIndex(where: { $0.id == currentSong.id }) {
             currentIndex = originalIndex
         }
+        
+        print("📋 播放列表已恢复原始顺序")
     }
     
     // MARK: - 文件导入（保持原有逻辑）

@@ -121,60 +121,10 @@ struct PlayerView: View {
                         }
                         .frame(height: 80) // 固定高度
                         
-                        Spacer().frame(height: 20)
+                        Spacer().frame(height: 40)
                         
-                        // 播放模式控制按钮
-                        HStack(spacing: 40) {
-                            // 随机播放按钮
-                            Button(action: {
-                                musicPlayer.togglePlaybackMode()
-                            }) {
-                                VStack(spacing: 4) {
-                                    Image(systemName: musicPlayer.playbackMode.iconName)
-                                        .font(.title3)
-                                        .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
-                                    Text(musicPlayer.playbackMode == .shuffle ? "随机" : "顺序")
-                                        .font(.caption)
-                                        .foregroundColor(musicPlayer.playbackMode == .shuffle ? .blue : .secondary)
-                                }
-                            }
-                            
-                            // 重复播放按钮
-                            Button(action: {
-                                musicPlayer.toggleRepeatMode()
-                            }) {
-                                VStack(spacing: 4) {
-                                    Image(systemName: musicPlayer.repeatMode.iconName)
-                                        .font(.title3)
-                                        .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
-                                    Text(getRepeatText())
-                                        .font(.caption)
-                                        .foregroundColor(musicPlayer.repeatMode != .off ? .blue : .secondary)
-                                }
-                            }
-                            
-                            // 播放队列按钮
-                            Button(action: {
-                                showingQueue = true
-                            }) {
-                                VStack(spacing: 4) {
-                                    Image(systemName: "list.number")
-                                        .font(.title3)
-                                        .foregroundColor(.secondary)
-                                    Text("队列")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                        .frame(height: 60)
-                        
-                        Spacer().frame(height: 15)
-                        
-                        // 功能按钮 - 只保留歌词按钮
-                        HStack {
-                            Spacer()
-                            
+                        // 功能按钮 - 歌词和队列并排
+                        HStack(spacing: 60) {
                             Button(action: {
                                 if musicPlayer.lyrics.isEmpty {
                                     showingLyricsPicker = true
@@ -192,7 +142,18 @@ struct PlayerView: View {
                                 }
                             }
                             
-                            Spacer()
+                            Button(action: {
+                                showingQueue = true
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "list.number")
+                                        .font(.title3)
+                                        .foregroundColor(.blue)
+                                    Text("播放队列")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                }
+                            }
                         }
                         .frame(height: 60) // 固定高度
                         
@@ -242,15 +203,6 @@ struct PlayerView: View {
         }
         .onAppear {
             dragOffset = .zero
-        }
-    }
-    
-    // 获取重复模式显示文本的辅助方法
-    private func getRepeatText() -> String {
-        switch musicPlayer.repeatMode {
-        case .off: return "关闭"
-        case .all: return "列表"
-        case .one: return "单曲"
         }
     }
 }
