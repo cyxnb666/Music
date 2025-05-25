@@ -69,8 +69,10 @@ struct PlaybackQueueView: View {
                                     }
                                 )
                             }
+                            .onMove(perform: moveItems)
                         }
                         .listStyle(PlainListStyle())
+                        .environment(\.editMode, .constant(.active)) // 始终启用编辑模式以支持拖拽
                     }
                 }
                 .padding(.top)
@@ -85,6 +87,16 @@ struct PlaybackQueueView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - 拖拽重排序处理
+    private func moveItems(from source: IndexSet, to destination: Int) {
+        // 调用MusicPlayer的重排序方法
+        musicPlayer.moveQueueItems(from: source, to: destination)
+        
+        // 提供触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
     }
 }
 
@@ -151,10 +163,11 @@ struct UpcomingSongRow: View {
     let song: Song
     let position: Int
     let onPlay: () -> Void
+    @Environment(\.editMode) private var editMode
     
     var body: some View {
         HStack(spacing: 12) {
-            // 序号
+            // 序号（始终显示）
             Text("\(position)")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -184,17 +197,22 @@ struct UpcomingSongRow: View {
             
             Spacer()
             
-            // 播放按钮
-            Button(action: onPlay) {
-                Image(systemName: "play.fill")
-                    .font(.caption)
-                    .foregroundColor(.blue)
+            // 播放按钮（仅在非编辑模式下显示）
+            if editMode?.wrappedValue != .active {
+                Button(action: onPlay) {
+                    Image(systemName: "play.fill")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            .buttonStyle(PlainButtonStyle())
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            onPlay()
+            // 只有在非编辑模式下才响应点击播放
+            if editMode?.wrappedValue != .active {
+                onPlay()
+            }
         }
     }
 }
