@@ -14,7 +14,7 @@ struct Song: Equatable {
     let artist: String
     let url: URL
     
-    // 实现Equatable协议
+    // Equatable协议
     static func == (lhs: Song, rhs: Song) -> Bool {
         return lhs.id == rhs.id
     }

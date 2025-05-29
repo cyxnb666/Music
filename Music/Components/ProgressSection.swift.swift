@@ -7,14 +7,14 @@
 
 import SwiftUI
 
-// MARK: - 进度条板块组件（紧凑版）
+// MARK: - 进度条板块组件
 struct ProgressSection: View {
     @Binding var currentTime: TimeInterval
     let duration: TimeInterval
     let onSeek: (TimeInterval) -> Void
     
     var body: some View {
-        VStack(spacing: 0) { // 改为0间距
+        VStack(spacing: 0) {
             // 可拖拽进度条
             DraggableProgressView(
                 currentTime: $currentTime,

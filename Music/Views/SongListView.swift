@@ -536,6 +536,7 @@ struct SongRowView: View {
 struct SongInfoView: View {
     let song: Song
     @Environment(\.dismiss) private var dismiss
+    @State private var audioDuration: TimeInterval? = nil // 添加状态变量来存储时长
     
     var body: some View {
         NavigationView {
@@ -562,8 +563,16 @@ struct SongInfoView: View {
                         InfoRow(label: "文件大小", value: fileSize)
                     }
                     
-                    if let duration = getAudioDuration(for: song.url) {
+                    if let duration = audioDuration {
                         InfoRow(label: "时长", value: formatDuration(duration))
+                    } else {
+                        HStack {
+                            Text("时长")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
                     }
                     
                     InfoRow(label: "文件格式", value: song.url.pathExtension.uppercased())
@@ -581,6 +590,9 @@ struct SongInfoView: View {
                     }
                 }
             }
+            .task { // 添加task来异步加载时长
+                await loadAudioDuration()
+            }
         }
     }
     
@@ -597,11 +609,33 @@ struct SongInfoView: View {
         return nil
     }
     
-    private func getAudioDuration(for url: URL) -> TimeInterval? {
-        let asset = AVURLAsset(url: url)
-        let duration = asset.duration
-        guard duration.isValid && !duration.isIndefinite else { return nil }
-        return CMTimeGetSeconds(duration)
+    // 异步方法来获取音频时长
+    private func loadAudioDuration() async {
+        let asset = AVURLAsset(url: song.url)
+        
+        do {
+            if #available(iOS 16.0, *) {
+                let duration = try await asset.load(.duration)
+                await MainActor.run {
+                    if duration.isValid && !duration.isIndefinite {
+                        self.audioDuration = CMTimeGetSeconds(duration)
+                    }
+                }
+            } else {
+                // 兼容旧版本
+                await MainActor.run {
+                    let duration = asset.duration
+                    if duration.isValid && !duration.isIndefinite {
+                        self.audioDuration = CMTimeGetSeconds(duration)
+                    }
+                }
+            }
+        } catch {
+            print("获取音频时长失败: \(error)")
+            await MainActor.run {
+                self.audioDuration = nil
+            }
+        }
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {

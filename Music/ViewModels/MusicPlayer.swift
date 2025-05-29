@@ -8,11 +8,10 @@
 import Foundation
 import AVFoundation
 import SwiftUI
-import MediaPlayer // 添加MediaPlayer框架
+import MediaPlayer // MediaPlayer框架
 
 // MARK: - 音乐播放器类
 class MusicPlayer: ObservableObject {
-    // 原有属性
     @Published var currentSong: Song?
     @Published var isPlaying = false
     @Published var currentTime: TimeInterval = 0
@@ -27,12 +26,12 @@ class MusicPlayer: ObservableObject {
     @Published var currentIndex: Int = 0           // 当前歌曲在列表中的索引
     @Published var playbackMode: PlaybackMode = .sequence {
         didSet {
-            savePlaybackSettings() // 播放模式改变时保存设置
+            savePlaybackSettings()
         }
     }
     @Published var repeatMode: RepeatMode = .off {
         didSet {
-            savePlaybackSettings() // 重复模式改变时保存设置
+            savePlaybackSettings()
         }
     }
     
@@ -51,7 +50,7 @@ class MusicPlayer: ObservableObject {
     }
     
     init() {
-        loadPlaybackSettings() // 启动时加载保存的设置
+        loadPlaybackSettings()
         setupAudioSession()
         setupRemoteTransportControls()
         setupNotificationObservers()
@@ -387,7 +386,7 @@ class MusicPlayer: ObservableObject {
         print("📋 播放列表已恢复原始顺序，当前索引: \(currentIndex)")
     }
     
-    // MARK: - 文件导入（保持原有逻辑）
+    // MARK: - 文件导入
     func handleFileImport(_ url: URL) {
         print("开始处理音乐文件导入: \(url.path)")
         
