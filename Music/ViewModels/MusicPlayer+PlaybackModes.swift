@@ -12,6 +12,9 @@ extension MusicPlayer {
     
     // MARK: - 播放模式切换
     func togglePlaybackMode() {
+        // 添加模式切换触觉反馈
+        HapticManager.shared.modeToggle()
+        
         switch playbackMode {
         case .sequence:
             playbackMode = .shuffle
@@ -28,6 +31,9 @@ extension MusicPlayer {
     
     // MARK: - 重复模式切换
     func toggleRepeatMode() {
+        // 添加模式切换触觉反馈
+        HapticManager.shared.modeToggle()
+        
         switch repeatMode {
         case .off:
             repeatMode = .all
@@ -50,9 +56,13 @@ extension MusicPlayer {
         
         // 如果当前播放时间超过3秒，先跳到歌曲开头
         if currentTime > 3.0 {
+            HapticManager.shared.selectionChanged()
             seekTo(time: 0)
             return
         }
+        
+        // 添加歌曲切换触觉反馈
+        HapticManager.shared.trackChange()
         
         let shouldContinuePlayingAfterLoad = isPlaying
         
@@ -101,6 +111,7 @@ extension MusicPlayer {
         
         // 单曲循环模式
         if repeatMode == .one {
+            HapticManager.shared.selectionChanged()
             seekTo(time: 0)
             let shouldContinuePlayingAfterSeek = isPlaying
             if shouldContinuePlayingAfterSeek {
@@ -110,6 +121,9 @@ extension MusicPlayer {
             }
             return
         }
+        
+        // 添加歌曲切换触觉反馈
+        HapticManager.shared.trackChange()
         
         let shouldContinuePlayingAfterLoad = isPlaying
         

@@ -58,6 +58,9 @@ class MusicPlayer: ObservableObject {
     
     // MARK: - 基本播放控制
     func togglePlayPause() {
+        // 添加触觉反馈
+        HapticManager.shared.playControl()
+        
         if isPlaying {
             pause()
         } else {
@@ -88,6 +91,9 @@ class MusicPlayer: ObservableObject {
     }
     
     func seekTo(time: TimeInterval) {
+        // 添加进度跳转触觉反馈
+        HapticManager.shared.selectionChanged()
+        
         let cmTime = CMTime(seconds: time, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         player?.seek(to: cmTime) { [weak self] _ in
             DispatchQueue.main.async {
@@ -99,12 +105,19 @@ class MusicPlayer: ObservableObject {
     func seekToLyric(at index: Int) {
         guard index < lyrics.count else { return }
         let lyric = lyrics[index]
+        
+        // 歌词跳转的特殊触觉反馈
+        HapticManager.shared.lyricBeat()
+        
         seekTo(time: lyric.time)
     }
     
     // MARK: - 歌曲加载
     func loadSong(_ song: Song) {
         print("加载歌曲: \(song.title)")
+        
+        // 添加文件加载成功的触觉反馈
+        HapticManager.shared.prepare()
         
         cleanupTimeObserver()
         player?.pause()
@@ -121,6 +134,11 @@ class MusicPlayer: ObservableObject {
         setupTimeObserver()
         setupPlayerItemObserver()
         loadSongDuration(from: playerItem)
+        
+        // 歌曲加载完成的触觉反馈
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            HapticManager.shared.success()
+        }
         
         print("歌曲加载完成: \(song.title)")
     }

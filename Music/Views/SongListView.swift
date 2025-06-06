@@ -93,26 +93,43 @@ struct SongListView: View {
             
             // 播放控制按钮区域
             playControlButtonsView
-            
+
             // 歌曲列表
             List {
-                ForEach(filteredSongs, id: \.id) { song in
+                ForEach(Array(filteredSongs.enumerated()), id: \.element.id) { index, song in
                     SongRowView(
                         song: song,
                         isPlaying: musicPlayer.currentSong?.id == song.id && musicPlayer.isPlaying,
                         isCurrentSong: musicPlayer.currentSong?.id == song.id,
                         onDelete: {
+                            // 删除操作的触觉反馈
+                            HapticManager.shared.operationConfirm()
                             deleteSong(song)
                         },
                         onPlay: {
+                            // 选择歌曲的触觉反馈
+                            HapticManager.shared.listSelection()
                             playSong(song)
                         }
                     )
+                    .animation(
+                        AppleAnimations.staggeredListAnimation(index: index),
+                        value: filteredSongs.count
+                    )
+                    .onTapGesture {
+                        HapticManager.shared.listSelection()
+                        playSong(song)
+                    }
                 }
             }
             .listStyle(PlainListStyle())
+            // 移除可能导致冲突的配置
+            // .scrollContentBackground(.hidden) // 注释掉这行
+            // .drawingGroup() // 注释掉这行
+            .background(AppColors.adaptiveBackground)
             // 为迷你播放器留出底部空间
             .padding(.bottom, musicPlayer.currentSong != nil ? 80 : 0)
+            .animation(AppleAnimations.standardTransition, value: musicPlayer.currentSong != nil)
         }
     }
     
@@ -156,13 +173,18 @@ struct SongListView: View {
                     TextField("搜索歌曲或艺术家", text: $searchText)
                         .textFieldStyle(PlainTextFieldStyle())
                         .onTapGesture {
-                            isSearching = true
+                            withAnimation(AppleAnimations.microInteraction) {
+                                isSearching = true
+                            }
                         }
                     
                     if !searchText.isEmpty {
                         Button(action: {
-                            searchText = ""
-                            isSearching = false
+                            HapticManager.shared.buttonTap()
+                            withAnimation(AppleAnimations.microInteraction) {
+                                searchText = ""
+                                isSearching = false
+                            }
                             // 隐藏键盘
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         }) {
@@ -170,17 +192,25 @@ struct SongListView: View {
                                 .foregroundColor(.secondary)
                                 .font(.body)
                         }
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(AppColors.adaptiveSecondaryBackground)
+                )
+                .scaleEffect(isSearching ? 1.02 : 1.0)
+                .animation(AppleAnimations.microInteraction, value: isSearching)
                 
                 if isSearching {
                     Button("取消") {
-                        searchText = ""
-                        isSearching = false
+                        HapticManager.shared.buttonTap()
+                        withAnimation(AppleAnimations.standardTransition) {
+                            searchText = ""
+                            isSearching = false
+                        }
                         // 隐藏键盘
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
@@ -189,7 +219,7 @@ struct SongListView: View {
                 }
             }
             .padding(.horizontal)
-            .animation(.easeInOut(duration: 0.3), value: isSearching)
+            .animation(AppleAnimations.standardTransition, value: isSearching)
             
             // 搜索结果提示
             if !searchText.isEmpty {
@@ -201,10 +231,12 @@ struct SongListView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(AppleAnimations.quickMicro, value: filteredSongs.count)
             }
         }
         .padding(.vertical, 12)
-        .background(Color(UIColor.systemBackground))
+        .background(AppColors.adaptiveBackground)
     }
     
     // MARK: - 播放控制按钮区域
@@ -215,6 +247,7 @@ struct SongListView: View {
                 HStack(spacing: 12) {
                     // 播放按钮（从第一首开始）
                     Button(action: {
+                        HapticManager.shared.playControl()
                         playFromBeginning()
                     }) {
                         HStack {
@@ -229,9 +262,13 @@ struct SongListView: View {
                         .background(AppColors.primary)
                         .cornerRadius(12)
                     }
+                    .scaleEffect(1.0)
+                    .animation(AppleAnimations.microInteraction, value: filteredSongs.count)
+                    .accessibilityLabel("播放所有歌曲")
                     
                     // 随机播放按钮
                     Button(action: {
+                        HapticManager.shared.modeToggle()
                         playRandomly()
                     }) {
                         HStack {
@@ -243,13 +280,16 @@ struct SongListView: View {
                         .foregroundColor(AppColors.primary)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(AppColors.primaryOpacity10)
+                        .background(AppColors.primaryOpacity08)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(AppColors.primary, lineWidth: 1)
                         )
                     }
+                    .scaleEffect(1.0)
+                    .animation(AppleAnimations.microInteraction, value: filteredSongs.count)
+                    .accessibilityLabel("随机播放所有歌曲")
                 }
                 .padding(.horizontal)
             }
@@ -270,9 +310,11 @@ struct SongListView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 20)
+                .transition(.scale.combined(with: .opacity))
+                .animation(AppleAnimations.standardTransition, value: filteredSongs.isEmpty)
             }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(AppColors.adaptiveBackground)
     }
     
     // MARK: - 播放歌曲
@@ -427,7 +469,7 @@ struct SongListView: View {
     }
 }
 
-// MARK: - 增强版歌曲行视图（支持上下文菜单）
+// MARK: - 增强版歌曲行视图（Apple Music风格）
 struct SongRowView: View {
     let song: Song
     let isPlaying: Bool
@@ -438,30 +480,37 @@ struct SongRowView: View {
     @State private var showingActionSheet = false
     @State private var showingDeleteAlert = false
     @State private var showingSongInfo = false
+    @State private var isPressed = false
     
     var body: some View {
         HStack(spacing: 12) {
-            // 播放状态指示器
+            // 播放状态指示器 - Apple Music风格
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isCurrentSong ? AppColors.primaryOpacity20 : Color.gray.opacity(0.1))
-                    .frame(width: 50, height: 50)
+                    .fill(isCurrentSong ? AppColors.primaryOpacity15 : AppColors.adaptiveSecondaryBackground)
+                    .frame(width: 48, height: 48) // Apple标准48pt
                 
                 if isPlaying {
+                    // 播放中的波形动画
                     Image(systemName: "waveform")
                         .font(.title3)
                         .foregroundColor(AppColors.primary)
                         .symbolEffect(.variableColor.iterative.dimInactiveLayers.nonReversing)
+                        .scaleEffect(1.1)
                 } else if isCurrentSong {
+                    // 当前歌曲但暂停
                     Image(systemName: "pause.fill")
                         .font(.title3)
                         .foregroundColor(AppColors.primary)
                 } else {
+                    // 普通状态
                     Image(systemName: "music.note")
                         .font(.title3)
                         .foregroundColor(.secondary)
                 }
             }
+            .animation(AppleAnimations.microInteraction, value: isPlaying)
+            .shadow(color: isCurrentSong ? AppColors.lightShadow : .clear, radius: 2, x: 0, y: 1)
             
             // 歌曲信息
             VStack(alignment: .leading, spacing: 4) {
@@ -469,6 +518,7 @@ struct SongRowView: View {
                     .font(.headline)
                     .foregroundColor(isCurrentSong ? AppColors.primary : .primary)
                     .lineLimit(1)
+                    .animation(AppleAnimations.quickMicro, value: isCurrentSong)
                 
                 Text(song.artist)
                     .font(.subheadline)
@@ -478,39 +528,72 @@ struct SongRowView: View {
             
             Spacer()
             
-            // 更多选项按钮 - 现在有功能了！
+            // 更多选项按钮 - 改进的触摸区域
             Button(action: {
+                HapticManager.shared.buttonTap()
                 showingActionSheet = true
             }) {
                 Image(systemName: "ellipsis")
                     .font(.title3)
                     .foregroundColor(.secondary)
-                    .frame(width: 30, height: 30) // 增大点击区域
+                    .frame(width: 44, height: 44) // Apple标准触摸区域
+                    .contentShape(Circle()) // 圆形触摸区域
             }
             .buttonStyle(PlainButtonStyle())
+            .scaleEffect(isPressed ? 0.9 : 1.0)
+            .animation(AppleAnimations.microInteraction, value: isPressed)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isPressed ? AppColors.primaryOpacity08 : Color.clear)
+                .animation(AppleAnimations.quickMicro, value: isPressed)
+        )
         .contentShape(Rectangle())
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(AppleAnimations.microInteraction, value: isPressed)
         .onTapGesture {
+            HapticManager.shared.listSelection()
             onPlay?()
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(AppleAnimations.quickMicro) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(AppleAnimations.quickMicro) {
+                        isPressed = false
+                    }
+                }
+        )
         
-        // 操作菜单
+        // 操作菜单 - Apple风格
         .actionSheet(isPresented: $showingActionSheet) {
             ActionSheet(
                 title: Text(song.title),
                 message: Text("选择操作"),
                 buttons: [
                     .default(Text("播放")) {
+                        HapticManager.shared.playControl()
                         onPlay?()
                     },
                     .default(Text("歌曲信息")) {
+                        HapticManager.shared.buttonTap()
                         showingSongInfo = true
                     },
                     .destructive(Text("从库中删除")) {
+                        HapticManager.shared.warning()
                         showingDeleteAlert = true
                     },
-                    .cancel(Text("取消"))
+                    .cancel(Text("取消")) {
+                        HapticManager.shared.buttonTap()
+                    }
                 ]
             )
         }
@@ -518,9 +601,12 @@ struct SongRowView: View {
         // 删除确认对话框
         .alert("删除歌曲", isPresented: $showingDeleteAlert) {
             Button("删除", role: .destructive) {
+                HapticManager.shared.operationConfirm()
                 onDelete?()
             }
-            Button("取消", role: .cancel) { }
+            Button("取消", role: .cancel) {
+                HapticManager.shared.buttonTap()
+            }
         } message: {
             Text("确定要从音乐库中删除「\(song.title)」吗？此操作无法撤销。")
         }
@@ -528,6 +614,23 @@ struct SongRowView: View {
         // 歌曲信息弹窗
         .sheet(isPresented: $showingSongInfo) {
             SongInfoView(song: song)
+        }
+        
+        // 可访问性支持
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(song.title)，\(song.artist)")
+        .accessibilityHint("双击播放，长按查看选项")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(isPlaying ? "正在播放" : isCurrentSong ? "当前歌曲，已暂停" : "")
+        .accessibilityAction(named: "播放") {
+            HapticManager.shared.playControl()
+            onPlay?()
+        }
+        .accessibilityAction(named: "删除") {
+            showingDeleteAlert = true
+        }
+        .accessibilityAction(named: "查看信息") {
+            showingSongInfo = true
         }
     }
 }

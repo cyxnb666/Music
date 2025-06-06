@@ -12,6 +12,9 @@ struct ContentView: View {
     @StateObject private var songLibrary = SongLibrary()
     @State private var showingFullPlayer = false
     
+    // MARK: - 英雄动画命名空间
+    @Namespace private var playerNamespace
+    
     var body: some View {
         ZStack {
             // 主要内容区域
@@ -30,24 +33,42 @@ struct ContentView: View {
                 
                 // 迷你播放器（底部悬浮，只在歌曲列表界面且有歌曲播放时显示）
                 if musicPlayer.currentSong != nil && songLibrary.hasImportedLibrary && !showingFullPlayer {
-                    MiniPlayerView(onTap: {
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            showingFullPlayer = true
+                    MiniPlayerView(
+                        namespace: playerNamespace,
+                        onTap: {
+                            // 触觉反馈
+                            HapticManager.shared.interfaceTransition()
+                            
+                            // Apple标准播放器转换动画
+                            withAnimation(AppleAnimations.playerTransition) {
+                                showingFullPlayer = true
+                            }
                         }
-                    })
+                    )
                     .environmentObject(musicPlayer)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+                    .animation(AppleAnimations.standardTransition, value: musicPlayer.currentSong != nil)
                 }
             }
-            .background(Color(UIColor.systemBackground))
+            .background(AppColors.adaptiveBackground)
             
             // 播放器覆盖层 - 完全全屏
             if showingFullPlayer {
-                PlayerView(onDismiss: {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        showingFullPlayer = false
+                PlayerView(
+                    namespace: playerNamespace,
+                    onDismiss: {
+                        // 触觉反馈
+                        HapticManager.shared.playerClose()
+                        
+                        // Apple标准播放器关闭动画
+                        withAnimation(AppleAnimations.playerTransition) {
+                            showingFullPlayer = false
+                        }
                     }
-                })
+                )
                 .environmentObject(musicPlayer)
                 .transition(.asymmetric(
                     insertion: .move(edge: .bottom),
@@ -57,7 +78,23 @@ struct ContentView: View {
                 .ignoresSafeArea(.all) // 完全全屏
             }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(AppColors.adaptiveBackground)
+        .onAppear {
+            // 应用启动时准备触觉反馈
+            HapticManager.shared.prepare()
+        }
+        .onChange(of: musicPlayer.currentSong) { oldValue, newValue in
+            // 歌曲变化时的触觉反馈
+            if oldValue != nil && newValue != nil && oldValue?.id != newValue?.id {
+                HapticManager.shared.trackChange()
+            }
+        }
+        .onChange(of: musicPlayer.isPlaying) { oldValue, newValue in
+            // 播放状态变化时的触觉反馈
+            if oldValue != newValue {
+                HapticManager.shared.playControl()
+            }
+        }
     }
 }
 
@@ -65,5 +102,9 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+            .preferredColorScheme(.light)
+        
+        ContentView()
+            .preferredColorScheme(.dark)
     }
 }

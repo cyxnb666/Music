@@ -5,9 +5,12 @@
 //  Created by Yaoxi Chen on 2025/5/24.
 //
 
+// 在PlaybackQueueView.swift中需要修改的关键部分
+
+// MARK: - 1. 在文件顶部修改导入和类定义
 import SwiftUI
 
-// MARK: - 播放队列视图
+// MARK: - 播放队列视图（Apple Music风格）
 struct PlaybackQueueView: View {
     @EnvironmentObject var musicPlayer: MusicPlayer
     @Environment(\.dismiss) private var dismiss
@@ -15,10 +18,10 @@ struct PlaybackQueueView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // 播放模式控制区域
+                // 播放模式控制区域 - 升级版
                 playbackControlsSection
                 
-                // 当前播放
+                // 当前播放 - 升级版
                 if let currentSong = musicPlayer.currentSong {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("正在播放")
@@ -29,10 +32,10 @@ struct PlaybackQueueView: View {
                             .padding(.horizontal)
                     }
                     .padding(.vertical)
-                    .background(Color.gray.opacity(0.1))
+                    .background(AppColors.adaptiveSecondaryBackground)
                 }
                 
-                // 播放队列信息
+                // 播放队列信息 - 升级版
                 let queueInfo = musicPlayer.getQueueInfo()
                 
                 VStack(alignment: .leading, spacing: 12) {
@@ -45,6 +48,10 @@ struct PlaybackQueueView: View {
                         Text("\(queueInfo.current)/\(queueInfo.total)")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppColors.primaryOpacity08)
+                            .cornerRadius(8)
                     }
                     .padding(.horizontal)
                     
@@ -57,6 +64,8 @@ struct PlaybackQueueView: View {
                                 .foregroundColor(.secondary)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(AppleAnimations.standardTransition, value: queueInfo.upcoming.isEmpty)
                     } else {
                         List {
                             ForEach(Array(queueInfo.upcoming.enumerated()), id: \.element.id) { index, song in
@@ -64,6 +73,7 @@ struct PlaybackQueueView: View {
                                     song: song,
                                     position: index + 1,
                                     onPlay: {
+                                        HapticManager.shared.listSelection()
                                         let actualIndex = musicPlayer.currentIndex + index + 1
                                         if actualIndex < musicPlayer.playlist.count {
                                             musicPlayer.playTrack(at: actualIndex)
@@ -71,29 +81,40 @@ struct PlaybackQueueView: View {
                                         dismiss()
                                     }
                                 )
+                                .animation(
+                                    AppleAnimations.staggeredListAnimation(index: index, stagger: 0.05),
+                                    value: queueInfo.upcoming.count
+                                )
                             }
                             .onMove(perform: moveItems)
                         }
                         .listStyle(PlainListStyle())
-                        .environment(\.editMode, .constant(.active)) // 始终启用编辑模式以支持拖拽
+                        .scrollContentBackground(.hidden)
+                        .background(AppColors.adaptiveBackground)
+                        .environment(\.editMode, .constant(.active))
                     }
                 }
                 .padding(.top)
             }
+            .background(AppColors.adaptiveBackground)
             .navigationTitle("播放队列")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("") {
+                    Button("完成") {
+                        HapticManager.shared.buttonTap()
                         dismiss()
                     }
-                    .foregroundColor(AppColors.primary)  // 新增这一行
+                    .foregroundColor(AppColors.primary)
                 }
             }
         }
+        .onAppear {
+            HapticManager.shared.prepare()
+        }
     }
     
-    // MARK: - 播放模式控制区域
+    // MARK: - 2. 升级播放模式控制区域
     private var playbackControlsSection: some View {
         VStack(spacing: 16) {
             Text("播放设置")
@@ -102,26 +123,26 @@ struct PlaybackQueueView: View {
                 .padding(.horizontal)
             
             HStack(spacing: 20) {
-                // 播放模式按钮
+                // 播放模式按钮 - 升级版
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    HapticManager.shared.modeToggle()
+                    withAnimation(AppleAnimations.standardTransition) {
                         musicPlayer.togglePlaybackMode()
                     }
-                    
-                    // 触觉反馈
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
                 }) {
                     VStack(spacing: 8) {
                         ZStack {
                             Circle()
-                                .fill(musicPlayer.playbackMode == .shuffle ? AppColors.primaryOpacity20 : Color.gray.opacity(0.1))
+                                .fill(musicPlayer.playbackMode == .shuffle ? AppColors.primaryOpacity20 : AppColors.adaptiveSecondaryBackground)
                                 .frame(width: 50, height: 50)
+                                .shadow(color: AppColors.lightShadow, radius: 2, x: 0, y: 1)
                             
                             Image(systemName: musicPlayer.playbackMode.iconName)
                                 .font(.title2)
                                 .foregroundColor(musicPlayer.playbackMode == .shuffle ? AppColors.primary : .secondary)
                         }
+                        .scaleEffect(musicPlayer.playbackMode == .shuffle ? 1.1 : 1.0)
+                        .animation(AppleAnimations.microInteraction, value: musicPlayer.playbackMode == .shuffle)
                         
                         Text(musicPlayer.playbackMode.displayName)
                             .font(.caption)
@@ -131,27 +152,29 @@ struct PlaybackQueueView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .frame(maxWidth: .infinity)
+                .accessibilityLabel("播放模式")
+                .accessibilityValue(musicPlayer.playbackMode.displayName)
                 
-                // 重复模式按钮
+                // 重复模式按钮 - 升级版
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    HapticManager.shared.modeToggle()
+                    withAnimation(AppleAnimations.standardTransition) {
                         musicPlayer.toggleRepeatMode()
                     }
-                    
-                    // 触觉反馈
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
                 }) {
                     VStack(spacing: 8) {
                         ZStack {
                             Circle()
-                                .fill(musicPlayer.repeatMode != .off ? AppColors.primaryOpacity20 : Color.gray.opacity(0.1))
+                                .fill(musicPlayer.repeatMode != .off ? AppColors.primaryOpacity20 : AppColors.adaptiveSecondaryBackground)
                                 .frame(width: 50, height: 50)
+                                .shadow(color: AppColors.lightShadow, radius: 2, x: 0, y: 1)
                             
                             Image(systemName: musicPlayer.repeatMode.iconName)
                                 .font(.title2)
                                 .foregroundColor(musicPlayer.repeatMode != .off ? AppColors.primary : .secondary)
                         }
+                        .scaleEffect(musicPlayer.repeatMode != .off ? 1.1 : 1.0)
+                        .animation(AppleAnimations.microInteraction, value: musicPlayer.repeatMode != .off)
                         
                         Text(getRepeatDisplayText())
                             .font(.caption)
@@ -161,6 +184,8 @@ struct PlaybackQueueView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .frame(maxWidth: .infinity)
+                .accessibilityLabel("重复模式")
+                .accessibilityValue(getRepeatDisplayText())
             }
             .padding(.horizontal)
             
@@ -173,20 +198,19 @@ struct PlaybackQueueView: View {
                 .padding(.bottom, 8)
         }
         .padding(.vertical, 16)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(AppColors.adaptiveSecondaryBackground)
     }
     
-    // MARK: - 拖拽重排序处理
+    // MARK: - 3. 升级拖拽重排序处理
     private func moveItems(from source: IndexSet, to destination: Int) {
         // 调用MusicPlayer的重排序方法
         musicPlayer.moveQueueItems(from: source, to: destination)
         
         // 提供触觉反馈
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        HapticManager.shared.operationConfirm()
     }
     
-    // MARK: - 辅助方法
+    // MARK: - 4. 辅助方法保持不变
     private func getRepeatDisplayText() -> String {
         switch musicPlayer.repeatMode {
         case .off: return "关闭重复"
@@ -212,30 +236,33 @@ struct PlaybackQueueView: View {
     }
 }
 
-// MARK: - 当前播放歌曲行
+// MARK: - 5. 升级当前播放歌曲行
 struct CurrentPlayingSongRow: View {
     let song: Song
     @EnvironmentObject var musicPlayer: MusicPlayer
     
     var body: some View {
         HStack(spacing: 12) {
-            // 播放动画指示器
+            // 播放动画指示器 - 升级版
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(AppColors.primaryOpacity20)
                     .frame(width: 50, height: 50)
+                    .shadow(color: AppColors.lightShadow, radius: 4, x: 0, y: 2)
                 
                 if musicPlayer.isPlaying {
                     Image(systemName: "waveform")
                         .font(.title3)
                         .foregroundColor(AppColors.primary)
                         .symbolEffect(.variableColor.iterative.dimInactiveLayers.nonReversing)
+                        .scaleEffect(1.1)
                 } else {
                     Image(systemName: "pause.fill")
                         .font(.title3)
                         .foregroundColor(AppColors.primary)
                 }
             }
+            .animation(AppleAnimations.microInteraction, value: musicPlayer.isPlaying)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
@@ -267,15 +294,19 @@ struct CurrentPlayingSongRow: View {
             }
         }
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("当前播放：\(song.title)")
+        .accessibilityValue(musicPlayer.isPlaying ? "正在播放" : "已暂停")
     }
 }
 
-// MARK: - 即将播放歌曲行
+// MARK: - 6. 升级即将播放歌曲行
 struct UpcomingSongRow: View {
     let song: Song
     let position: Int
     let onPlay: () -> Void
     @Environment(\.editMode) private var editMode
+    @State private var isPressed = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -285,15 +316,16 @@ struct UpcomingSongRow: View {
                 .foregroundColor(.secondary)
                 .frame(width: 20)
             
-            // 封面占位符
+            // 封面占位符 - 升级版
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.gray.opacity(0.2))
+                .fill(AppColors.adaptiveSecondaryBackground)
                 .frame(width: 40, height: 40)
                 .overlay(
                     Image(systemName: "music.note")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 )
+                .shadow(color: AppColors.lightShadow, radius: 1, x: 0, y: 0.5)
             
             // 歌曲信息
             VStack(alignment: .leading, spacing: 2) {
@@ -311,20 +343,51 @@ struct UpcomingSongRow: View {
             
             // 播放按钮（仅在非编辑模式下显示）
             if editMode?.wrappedValue != .active {
-                Button(action: onPlay) {
+                Button(action: {
+                    HapticManager.shared.listSelection()
+                    onPlay()
+                }) {
                     Image(systemName: "play.fill")
                         .font(.caption)
                         .foregroundColor(AppColors.primary)
+                        .frame(width: 32, height: 32)
+                        .background(AppColors.primaryOpacity08)
+                        .clipShape(Circle())
                 }
                 .buttonStyle(PlainButtonStyle())
+                .scaleEffect(isPressed ? 0.9 : 1.0)
+                .animation(AppleAnimations.microInteraction, value: isPressed)
             }
         }
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(AppleAnimations.microInteraction, value: isPressed)
         .onTapGesture {
             // 只有在非编辑模式下才响应点击播放
             if editMode?.wrappedValue != .active {
+                HapticManager.shared.listSelection()
                 onPlay()
             }
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(AppleAnimations.quickMicro) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(AppleAnimations.quickMicro) {
+                        isPressed = false
+                    }
+                }
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("第\(position)首：\(song.title)")
+        .accessibilityHint("双击播放")
+        .accessibilityAddTraits(.isButton)
     }
 }
